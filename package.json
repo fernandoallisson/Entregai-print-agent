@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Entregaí Print Agent",
+  "author": "Entregaí",
   "main": "src/main/main.js",
   "scripts": {
     "dev": "electron .",
@@ -24,15 +25,28 @@
     },
     "files": [
       "src/**/*",
+      "public/**/*",
+      "build/**/*",
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeader": "build/installer-header.bmp",
+      "installerSidebar": "build/installer-sidebar.bmp",
+      "uninstallerSidebar": "build/installer-sidebar.bmp",
+      "shortcutName": "Entregaí Print Agent",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
     }
   }
 }

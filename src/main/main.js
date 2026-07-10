@@ -20,6 +20,7 @@ function createWindow() {
     minWidth: 760,
     minHeight: 560,
     title: 'Entregaí Print Agent',
+    icon: path.join(app.getAppPath(), 'build/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
