@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entregaí Print Agent</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <div class="brand">
+        <div class="mark">E</div>
+        <div>
+          <h1>Entregaí Print Agent</h1>
+          <p id="subtitle">Vincule este computador à loja para impressão silenciosa.</p>
+        </div>
+      </div>
+
+      <div id="pairing" class="pairing">
+        <label for="pairingCode">Código de vinculação</label>
+        <input id="pairingCode" inputmode="numeric" autocomplete="one-time-code" placeholder="784 291" maxlength="7" />
+        <button id="pairButton">Vincular computador</button>
+        <p class="hint">O código é gerado no Admin em Configurações > Impressão.</p>
+      </div>
+
+      <div id="status" class="status hidden">
+        <div class="status-line">
+          <span id="statusDot" class="dot"></span>
+          <strong id="statusText">Conectando...</strong>
+        </div>
+        <dl>
+          <div><dt>Computador</dt><dd id="deviceName">-</dd></div>
+          <div><dt>Device ID</dt><dd id="deviceId">-</dd></div>
+          <div><dt>Agente</dt><dd id="agentName">-</dd></div>
+          <div><dt>Impressoras</dt><dd id="printers">-</dd></div>
+          <div><dt>Última conexão</dt><dd id="lastSeen">-</dd></div>
+        </dl>
+        <button id="clearButton" class="secondary">Desvincular este computador</button>
+      </div>
+
+      <p id="message" class="message"></p>
+    </section>
+  </main>
+  <script src="./renderer.js"></script>
+</body>
+</html>
