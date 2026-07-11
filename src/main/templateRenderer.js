@@ -159,14 +159,26 @@ function renderTotals(totals = null, typeLabel = '') {
 }
 
 function renderStyles(width, isKitchen) {
+  const paperWidth = Number(width);
+  const pageWidth = Number.isFinite(paperWidth) && paperWidth > 0 ? paperWidth : 80;
+  const printableWidth = Math.max(42, pageWidth - 5);
+
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: ${width}mm; min-height: 30mm; margin: 0; padding: 0; }
+    html {
+      width: ${pageWidth}mm;
+      min-height: 30mm;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      margin: 0;
+    }
     body {
       font-family: "Courier New", monospace;
-      width: ${width}mm;
-      max-width: ${width}mm;
-      padding: 3mm;
+      width: ${printableWidth}mm;
+      max-width: ${printableWidth}mm;
+      padding: 3mm 2mm 3mm 3mm;
       color: #000;
       font-size: ${isKitchen ? 19 : 13}px;
       font-weight: ${isKitchen ? 900 : 500};
@@ -181,9 +193,9 @@ function renderStyles(width, isKitchen) {
     .divider { border-top: 1px dashed #000; margin: 8px 0; }
     .solid { border-top: ${isKitchen ? 2 : 1}px solid #000; margin: ${isKitchen ? 10 : 8}px 0; }
     .thin { border-top-width: 1px; }
-    .row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+    .row { display: flex; justify-content: space-between; gap: 6px; width: 100%; margin-bottom: 3px; }
     .row > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
-    .row > span:last-child { white-space: nowrap; }
+    .row > span:last-child { flex: 0 0 auto; max-width: 44%; text-align: right; white-space: nowrap; }
     .tag { display: inline-block; border: ${isKitchen ? 2 : 1}px solid #000; padding: 1px 6px; font-size: ${isKitchen ? 18 : 12}px; margin: 2px; font-weight: 900; }
     .ticket-number { border: ${isKitchen ? 3 : 1}px solid #000; padding: ${isKitchen ? 9 : 5}px 4px; margin: 8px 0; text-align: center; }
     .ticket-label { font-size: ${isKitchen ? 17 : 12}px; font-weight: 900; }
@@ -209,7 +221,7 @@ function renderStyles(width, isKitchen) {
     .total { font-size: ${isKitchen ? 20 : 15}px; font-weight: 900; }
     .kitchen-empty { font-size: 20px; font-weight: 900; }
     p { margin-bottom: 4px; }
-    @page { size: ${width}mm auto; margin: 0; }
+    @page { size: ${pageWidth}mm auto; margin: 0; }
   `;
 }
 

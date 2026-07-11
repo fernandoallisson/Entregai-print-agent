@@ -30,7 +30,12 @@ class PrinterService {
     try {
       await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
       await new Promise((resolve, reject) => {
-        win.webContents.print({ silent: true, deviceName, printBackground: false }, (success, failureReason) => {
+        win.webContents.print({
+          silent: true,
+          deviceName,
+          printBackground: false,
+          margins: { marginType: 'none' },
+        }, (success, failureReason) => {
           if (success) resolve();
           else reject(Object.assign(new Error(failureReason || 'Falha ao imprimir'), { code: failureReason || 'PRINT_FAILED' }));
         });
