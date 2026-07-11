@@ -2,8 +2,9 @@ const { BrowserWindow } = require('electron');
 const { renderJob } = require('./templateRenderer');
 
 class PrinterService {
-  constructor(mainWindowProvider) {
+  constructor(mainWindowProvider, printLayoutProvider = null) {
     this.mainWindowProvider = mainWindowProvider;
+    this.printLayoutProvider = printLayoutProvider;
   }
 
   async listPrinters() {
@@ -25,7 +26,7 @@ class PrinterService {
       throw Object.assign(new Error('Impressora não encontrada para o job'), { code: 'PRINTER_NOT_FOUND' });
     }
 
-    const html = renderJob(job);
+    const html = renderJob(job, this.printLayoutProvider?.());
     const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
     try {
       await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);

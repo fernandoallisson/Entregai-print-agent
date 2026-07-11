@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const { app, safeStorage } = require('electron');
+const { DEFAULT_PRINT_LAYOUT, normalizePrintLayoutConfig } = require('./printLayoutConfig');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -14,6 +15,7 @@ class SecureStore {
     ensureDir(this.dir);
     this.configPath = path.join(this.dir, 'config.json');
     this.credentialPath = path.join(this.dir, 'credential.json');
+    this.printLayoutPath = path.join(this.dir, 'print-layout.json');
   }
 
   readJson(filePath, fallback) {
@@ -74,6 +76,22 @@ class SecureStore {
     } catch {
       // Credencial ausente.
     }
+  }
+
+  readPrintLayout() {
+    return normalizePrintLayoutConfig(this.readJson(this.printLayoutPath, DEFAULT_PRINT_LAYOUT));
+  }
+
+  savePrintLayout(config) {
+    const normalized = normalizePrintLayoutConfig(config);
+    this.writeJson(this.printLayoutPath, normalized);
+    return normalized;
+  }
+
+  resetPrintLayout() {
+    const normalized = normalizePrintLayoutConfig(DEFAULT_PRINT_LAYOUT);
+    this.writeJson(this.printLayoutPath, normalized);
+    return normalized;
   }
 }
 

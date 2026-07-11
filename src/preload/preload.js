@@ -4,6 +4,10 @@ contextBridge.exposeInMainWorld('entregaiAgent', {
   getStatus: () => ipcRenderer.invoke('agent:get-status'),
   pair: (pairingCode) => ipcRenderer.invoke('agent:pair', pairingCode),
   clear: () => ipcRenderer.invoke('agent:clear'),
+  getPrintLayout: () => ipcRenderer.invoke('print-layout:get'),
+  savePrintLayout: (config) => ipcRenderer.invoke('print-layout:save', config),
+  resetPrintLayout: () => ipcRenderer.invoke('print-layout:reset'),
+  previewPrintLayout: (profile, config) => ipcRenderer.invoke('print-layout:preview', profile, config),
   onStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('agent:status', listener);

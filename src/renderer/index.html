@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <div class="background-brand" aria-hidden="true"></div>
-    <section class="panel">
+    <section id="mainPanel" class="panel">
       <div class="brand">
         <img class="brand-logo" src="../../public/icons/backgroung_sem_fundo.png" alt="Entregaí Print Agent" />
         <div>
@@ -41,6 +41,170 @@
       </div>
 
       <p id="message" class="message"></p>
+      <div class="main-actions">
+        <button id="layoutToggleButton" class="secondary" type="button">Editar layout de impressão</button>
+      </div>
+    </section>
+
+    <section id="layoutPanel" class="panel layout-panel hidden">
+      <div class="section-heading">
+        <div>
+          <h2>Layout de impressão</h2>
+          <p>Ajuste separadamente os cupons do cliente e da cozinha.</p>
+        </div>
+        <div class="heading-actions">
+          <div class="profile-tabs" role="tablist" aria-label="Tipo de cupom">
+            <button id="customerTab" class="tab-button active" type="button">Cliente</button>
+            <button id="kitchenTab" class="tab-button" type="button">Cozinha</button>
+          </div>
+          <button id="closeLayoutButton" class="secondary compact-button" type="button">Fechar</button>
+        </div>
+      </div>
+
+      <div class="layout-grid">
+        <div class="builder">
+          <details class="editor-section">
+            <summary>Configuração geral</summary>
+            <div class="section-body">
+              <div class="field-row">
+                <label for="paperWidth">Largura do papel</label>
+                <select id="paperWidth">
+                  <option value="58">58 mm</option>
+                  <option value="80">80 mm</option>
+                </select>
+              </div>
+            </div>
+          </details>
+
+          <details class="editor-section">
+            <summary>Produtos</summary>
+            <div class="section-body options-box flat">
+              <label class="check-line">
+                <input id="showPrices" type="checkbox" />
+                <span>Mostrar preços nos produtos</span>
+              </label>
+              <label class="check-line">
+                <input id="showOptions" type="checkbox" />
+                <span>Mostrar adicionais/opções</span>
+              </label>
+              <label class="check-line">
+                <input id="showNotes" type="checkbox" />
+                <span>Mostrar observações dos itens</span>
+              </label>
+            </div>
+          </details>
+
+          <details class="editor-section">
+            <summary>Adicionais</summary>
+            <div class="section-body options-box flat">
+              <label class="check-line">
+                <input id="showOptionGroups" type="checkbox" />
+                <span>Mostrar nome do grupo</span>
+              </label>
+              <label class="check-line">
+                <input id="showOptionQuantities" type="checkbox" />
+                <span>Mostrar quantidade/percentual</span>
+              </label>
+              <label class="check-line">
+                <input id="uppercaseOptions" type="checkbox" />
+                <span>Imprimir em maiúsculas</span>
+              </label>
+              <label class="check-line">
+                <input id="boldOptions" type="checkbox" />
+                <span>Imprimir em negrito</span>
+              </label>
+              <label class="check-line">
+                <input id="highlightOptions" type="checkbox" />
+                <span>Destacar com borda</span>
+              </label>
+              <div class="field-row">
+                <label for="optionPrefix">Prefixo antes de cada adicional</label>
+                <input id="optionPrefix" class="text-input" maxlength="12" placeholder="+, -, *, ADIC." />
+              </div>
+            </div>
+          </details>
+
+          <details class="editor-section advanced-box">
+            <summary>Ajustes avançados</summary>
+            <div class="section-body">
+              <h3>Margens</h3>
+              <div class="number-grid">
+                <label>Superior <input id="marginTop" type="number" min="0" max="20" step="0.5" /></label>
+                <label>Direita <input id="marginRight" type="number" min="0" max="20" step="0.5" /></label>
+                <label>Inferior <input id="marginBottom" type="number" min="0" max="20" step="0.5" /></label>
+                <label>Esquerda <input id="marginLeft" type="number" min="0" max="20" step="0.5" /></label>
+              </div>
+
+              <h3>Espaçamentos</h3>
+              <div class="number-grid">
+                <label>Entre blocos <input id="blockGap" type="number" min="0" max="48" step="1" /></label>
+                <label>Entre linhas <input id="lineGap" type="number" min="0" max="24" step="1" /></label>
+                <label>Entre itens <input id="itemGap" type="number" min="0" max="64" step="1" /></label>
+                <label>Recuo de opções <input id="indent" type="number" min="0" max="48" step="1" /></label>
+                <label>Padding das caixas <input id="boxPadding" type="number" min="0" max="32" step="1" /></label>
+                <label>Redução da área útil <input id="printableReduction" type="number" min="0" max="20" step="0.5" /></label>
+              </div>
+
+              <h3>Tamanhos de texto</h3>
+              <div class="number-grid">
+                <label>Texto geral <input id="baseFont" type="number" min="8" max="40" step="1" /></label>
+                <label>Título <input id="titleFont" type="number" min="8" max="56" step="1" /></label>
+                <label>Nº da comanda <input id="ticketFont" type="number" min="12" max="96" step="1" /></label>
+                <label>Produto <input id="productFont" type="number" min="8" max="64" step="1" /></label>
+                <label>Adicionais <input id="optionFont" type="number" min="8" max="48" step="1" /></label>
+                <label>Observação <input id="noteFont" type="number" min="8" max="56" step="1" /></label>
+                <label>Dados/caixas <input id="metaFont" type="number" min="8" max="48" step="1" /></label>
+                <label>Total <input id="totalFont" type="number" min="8" max="56" step="1" /></label>
+              </div>
+
+              <h3>Bordas e linhas</h3>
+              <div class="options-box compact flat">
+                <label class="check-line">
+                  <input id="showBorders" type="checkbox" />
+                  <span>Mostrar bordas e linhas</span>
+                </label>
+              </div>
+              <div class="number-grid">
+                <label>Espessura das caixas <input id="borderWidth" type="number" min="0" max="8" step="1" /></label>
+                <label>Espessura divisórias <input id="dividerWidth" type="number" min="0" max="8" step="1" /></label>
+                <label>Linha entre itens <input id="itemDividerWidth" type="number" min="0" max="8" step="1" /></label>
+              </div>
+            </div>
+          </details>
+
+          <details class="editor-section">
+            <summary>Blocos do cupom</summary>
+            <div class="section-body">
+              <div id="blockList" class="block-list"></div>
+            </div>
+          </details>
+
+          <details class="editor-section">
+            <summary>Rodapé</summary>
+            <div class="section-body">
+              <div class="field-row">
+                <label for="footerText">Texto do rodapé</label>
+                <textarea id="footerText" rows="3" maxlength="240" placeholder="Obrigado pela preferência!"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button id="saveLayoutButton" type="button">Salvar layout</button>
+            <button id="resetLayoutButton" class="secondary" type="button">Restaurar padrão</button>
+          </div>
+        </div>
+
+        <div class="preview-panel">
+          <div class="preview-heading">
+            <strong>Preview</strong>
+            <span id="layoutMessage"></span>
+          </div>
+          <div id="previewViewport" class="preview-viewport">
+            <iframe id="printPreview" title="Preview do cupom"></iframe>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
   <script src="./renderer.js"></script>
