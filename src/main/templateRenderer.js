@@ -227,7 +227,7 @@ function renderFooter(profile = {}) {
 function renderBlock(block, content) {
   const trimmed = text(content);
   if (!block.enabled || !trimmed) return '';
-  return `<section class="${blockClass(block)}">${content}</section>`;
+  return `<section class="${blockClass(block)}" data-preview-block="${escapeHtml(block.id)}">${content}</section>`;
 }
 
 function cssNumber(value, fallback) {
@@ -293,6 +293,18 @@ function renderStyles(width, isKitchen, profile = {}) {
     }
     body * { color: #000 !important; }
     body, .print-block, .item { overflow-x: hidden; }
+    @media screen {
+      .preview-highlight {
+        position: relative;
+        outline: 2px solid #0082dc !important;
+        outline-offset: 2px;
+        background: rgba(0, 130, 220, 0.08) !important;
+        box-shadow: 0 0 0 5px rgba(0, 130, 220, 0.12) !important;
+      }
+      body.preview-highlight {
+        outline-offset: -2px;
+      }
+    }
     .center { text-align: center; }
     .print-block { --block-scale: 1; margin-bottom: ${blockGap}px; text-align: left; }
     .align-left { text-align: left; }

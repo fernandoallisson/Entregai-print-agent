@@ -1,16 +1,119 @@
 const path = require('path');
-const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('fs');
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray } = require('electron');
 const SecureStore = require('./secureStore');
 const { loadEnvFiles } = require('./envLoader');
 const AgentRuntime = require('./agentRuntime');
 const { renderJob } = require('./templateRenderer');
+const { normalizePrintLayoutConfig } = require('./printLayoutConfig');
 
 let mainWindow;
 let runtime;
+let tray;
+let isQuitting = false;
+let closePromptOpen = false;
 
 function sendStatus(status) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('agent:status', status);
+  }
+}
+
+function sharedLayoutFileName() {
+  const date = new Date().toISOString().slice(0, 10);
+  return `entregai-layout-impressao-${date}.json`;
+}
+
+function appIconPath() {
+  return path.join(app.getAppPath(), 'build/icon.ico');
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.show();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(appIconPath());
+  tray.setToolTip('Entregaí Print Agent');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Abrir Entregaí Print Agent', click: showMainWindow },
+    { type: 'separator' },
+    {
+      label: 'Sair',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]));
+  tray.on('click', showMainWindow);
+  tray.on('double-click', showMainWindow);
+}
+
+function setStartWithWindows(enabled) {
+  if (process.platform !== 'win32') return;
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    path: process.execPath,
+  });
+}
+
+async function askStartWithWindows(store) {
+  if (process.platform !== 'win32' || !app.isPackaged) return;
+  const config = store.readConfig();
+  if (config.startWithWindowsPrompted) return;
+
+  const response = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Iniciar com o Windows',
+    message: 'Deseja iniciar o Entregaí Print Agent junto com o Windows?',
+    detail: 'Isso mantém o agente disponível para impressão silenciosa depois que o computador ligar.',
+    buttons: ['Sim, iniciar com o Windows', 'Não'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+
+  const enabled = response.response === 0;
+  setStartWithWindows(enabled);
+  store.updateConfig({
+    startWithWindowsPrompted: true,
+    startWithWindows: enabled,
+  });
+}
+
+async function askCloseAction(event) {
+  if (isQuitting) return;
+  event.preventDefault();
+  if (closePromptOpen) return;
+
+  closePromptOpen = true;
+  try {
+    const response = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      title: 'Fechar Entregaí Print Agent',
+      message: 'O que deseja fazer com o agente de impressão?',
+      detail: 'Minimizar mantém o agente rodando em segundo plano para continuar recebendo impressões.',
+      buttons: ['Minimizar', 'Sair', 'Cancelar'],
+      defaultId: 0,
+      cancelId: 2,
+    });
+
+    if (response.response === 0) {
+      createTray();
+      mainWindow.hide();
+      return;
+    }
+
+    if (response.response === 1) {
+      isQuitting = true;
+      app.quit();
+    }
+  } finally {
+    closePromptOpen = false;
   }
 }
 
@@ -21,7 +124,7 @@ function createWindow() {
     minWidth: 760,
     minHeight: 560,
     title: 'Entregaí Print Agent',
-    icon: path.join(app.getAppPath(), 'build/icon.ico'),
+    icon: appIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
@@ -31,6 +134,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.on('close', askCloseAction);
 }
 
 function previewJob(profile) {
@@ -101,8 +205,12 @@ app.whenReady().then(() => {
   loadEnvFiles();
   const store = new SecureStore();
   createWindow();
+  createTray();
   runtime = new AgentRuntime(store, () => mainWindow, sendStatus);
   runtime.start();
+  mainWindow.webContents.once('did-finish-load', () => {
+    askStartWithWindows(store);
+  });
 
   ipcMain.handle('agent:get-status', () => runtime.status());
   ipcMain.handle('agent:pair', async (event, pairingCode) => runtime.pair(pairingCode));
@@ -114,12 +222,44 @@ app.whenReady().then(() => {
   ipcMain.handle('print-layout:save', (_event, config) => store.savePrintLayout(config));
   ipcMain.handle('print-layout:reset', () => store.resetPrintLayout());
   ipcMain.handle('print-layout:preview', (_event, profile, config) => renderJob(previewJob(profile), config || store.readPrintLayout()));
+  ipcMain.handle('print-layout:export', async (_event, config) => {
+    const normalized = normalizePrintLayoutConfig(config || store.readPrintLayout());
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Baixar layout salvo',
+      defaultPath: sharedLayoutFileName(),
+      filters: [{ name: 'Layout de impressão Entregaí', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true, layout: normalized };
+    fs.writeFileSync(result.filePath, JSON.stringify(normalized, null, 2), { mode: 0o600 });
+    return { canceled: false, filePath: result.filePath, layout: normalized };
+  });
+  ipcMain.handle('print-layout:import', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Usar layout compartilhado',
+      properties: ['openFile'],
+      filters: [{ name: 'Layout de impressão Entregaí', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePaths?.[0]) return { canceled: true, layout: store.readPrintLayout() };
+
+    let parsed;
+    try {
+      parsed = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
+    } catch {
+      throw new Error('Arquivo de layout inválido.');
+    }
+
+    const normalized = store.savePrintLayout(parsed);
+    return { canceled: false, filePath: result.filePaths[0], layout: normalized };
+  });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (isQuitting && process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   runtime?.stop();
 });
+
+app.on('activate', showMainWindow);

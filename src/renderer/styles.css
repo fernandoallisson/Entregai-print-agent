@@ -278,11 +278,13 @@ button.compact-button {
 .layout-grid {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(360px, 460px);
+  align-items: start;
   gap: 20px;
 }
 
 .builder {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -355,27 +357,35 @@ textarea:focus,
 }
 
 .editor-section {
+  min-width: 0;
   border: 1px solid #dbe3ee;
   border-radius: 8px;
-  padding: 12px;
+  padding: 0;
   background: #fff;
+}
+
+.editor-section[open],
+.actions {
+  grid-column: 1 / -1;
 }
 
 .editor-section > summary {
   cursor: pointer;
+  min-height: 42px;
+  padding: 12px;
   font-size: 14px;
   font-weight: 900;
   color: var(--navy);
 }
 
 .section-body {
-  margin-top: 12px;
+  padding: 0 12px 12px;
 }
 
 .advanced-box {
   border: 1px solid #dbe3ee;
   border-radius: 8px;
-  padding: 12px;
+  padding: 0;
   background: #fff;
 }
 
@@ -497,7 +507,11 @@ button.icon-button:disabled {
 }
 
 .preview-panel {
+  position: sticky;
+  top: 18px;
+  align-self: start;
   min-width: 0;
+  max-height: calc(100vh - 36px);
   border: 1px solid #dbe3ee;
   border-radius: 8px;
   overflow: hidden;
@@ -523,8 +537,8 @@ button.icon-button:disabled {
 
 .preview-viewport {
   width: 100%;
-  height: calc(100vh - 190px);
-  min-height: 560px;
+  height: calc(100vh - 82px);
+  min-height: 0;
   overflow: auto;
   display: flex;
   justify-content: center;
@@ -547,6 +561,12 @@ button.icon-button:disabled {
   border: 0;
   background: #fff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+
+@media (max-width: 1120px) {
+  .builder {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -587,6 +607,10 @@ button.icon-button:disabled {
     display: grid;
   }
 
+  .builder {
+    grid-template-columns: 1fr;
+  }
+
   .layout-panel.panel {
     min-height: auto;
   }
@@ -595,6 +619,11 @@ button.icon-button:disabled {
     height: 460px;
     min-height: 460px;
     justify-content: flex-start;
+  }
+
+  .preview-panel {
+    position: static;
+    max-height: none;
   }
 
   #printPreview {

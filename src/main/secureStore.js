@@ -47,6 +47,18 @@ class SecureStore {
     return config.deviceName || os.hostname();
   }
 
+  readConfig() {
+    return this.readJson(this.configPath, {});
+  }
+
+  updateConfig(patch) {
+    const config = this.readConfig();
+    this.writeJson(this.configPath, {
+      ...config,
+      ...patch,
+    });
+  }
+
   saveCredential({ token, agent, environment }) {
     const encrypted = safeStorage.isEncryptionAvailable()
       ? safeStorage.encryptString(token).toString('base64')

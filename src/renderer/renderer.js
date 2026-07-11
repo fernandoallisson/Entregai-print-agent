@@ -53,6 +53,8 @@ const blockList = document.getElementById('blockList');
 const footerText = document.getElementById('footerText');
 const saveLayoutButton = document.getElementById('saveLayoutButton');
 const resetLayoutButton = document.getElementById('resetLayoutButton');
+const exportLayoutButton = document.getElementById('exportLayoutButton');
+const importLayoutButton = document.getElementById('importLayoutButton');
 const previewViewport = document.getElementById('previewViewport');
 const printPreview = document.getElementById('printPreview');
 const layoutMessage = document.getElementById('layoutMessage');
@@ -86,6 +88,67 @@ let activeProfile = 'customer';
 let printLayout = null;
 let previewTimer = null;
 let layoutEditorOpen = false;
+let activePreviewTarget = null;
+
+const previewTargetByControl = {
+  paperWidth: 'document',
+  showPrices: 'items',
+  showOptions: 'options',
+  showNotes: 'notes',
+  showOptionGroups: 'options',
+  showOptionQuantities: 'options',
+  uppercaseOptions: 'options',
+  boldOptions: 'options',
+  highlightOptions: 'options',
+  optionPrefix: 'options',
+  marginTop: 'document',
+  marginRight: 'document',
+  marginBottom: 'document',
+  marginLeft: 'document',
+  blockGap: 'blocks',
+  lineGap: 'document',
+  itemGap: 'items',
+  indent: 'options',
+  boxPadding: 'boxes',
+  printableReduction: 'document',
+  baseFont: 'document',
+  titleFont: 'title',
+  ticketFont: 'title',
+  productFont: 'products',
+  optionFont: 'options',
+  noteFont: 'notes',
+  metaFont: 'meta',
+  totalFont: 'totals',
+  showBorders: 'boxes',
+  borderWidth: 'boxes',
+  dividerWidth: 'dividers',
+  itemDividerWidth: 'items',
+  footerText: 'footer',
+};
+
+const previewSelectorsByTarget = {
+  document: ['body'],
+  blocks: ['.print-block'],
+  boxes: ['.info-box', '.address-box', '.payment-box', '.ticket-number', '.kitchen-meta', '.tag'],
+  dividers: ['.divider', '.solid'],
+  items: ['[data-preview-block="items"]', '.item'],
+  products: ['.product'],
+  options: ['.option'],
+  notes: ['.obs'],
+  meta: [
+    '[data-preview-block="customer"]',
+    '[data-preview-block="address"]',
+    '[data-preview-block="payment"]',
+    '[data-preview-block="kitchenMeta"]',
+    '.info-box',
+    '.address-box',
+    '.payment-box',
+    '.kitchen-meta',
+  ],
+  title: ['[data-preview-block="title"]', '.ticket-number'],
+  totals: ['[data-preview-block="totals"]', '.total'],
+  footer: ['[data-preview-block="footer"]'],
+};
 
 function render(status) {
   const paired = Boolean(status?.paired);
@@ -155,8 +218,14 @@ function option(value, label, selected) {
 
 function renderBlockControls() {
   const profile = currentProfile();
+  const openBlockIds = new Set(
+    Array.from(blockList.querySelectorAll('.block-card[open][data-block-id]'))
+      .map((card) => card.dataset.blockId)
+      .filter(Boolean)
+  );
+
   blockList.innerHTML = profile.blocks.map((block, index) => `
-    <details class="block-card" data-index="${index}">
+    <details class="block-card" data-index="${index}" data-block-id="${block.id}" ${openBlockIds.has(block.id) ? 'open' : ''}>
       <summary class="block-summary">
         <span>${blockLabels[block.id] || block.id}</span>
       </summary>
@@ -293,11 +362,61 @@ function updatePreviewFrameSize() {
   previewViewport.style.setProperty('--paper-width', `${width}px`);
 }
 
+function previewSelectors(target) {
+  if (!target) return [];
+  if (target.startsWith('block:')) {
+    const blockId = target.slice('block:'.length);
+    return [`[data-preview-block="${blockId}"]`];
+  }
+  return previewSelectorsByTarget[target] || [];
+}
+
+function clearPreviewHighlight(doc = printPreview.contentDocument) {
+  if (!doc) return;
+  doc.querySelectorAll('.preview-highlight').forEach((element) => {
+    element.classList.remove('preview-highlight');
+  });
+}
+
+function applyPreviewHighlight({ shouldScroll = false } = {}) {
+  const doc = printPreview.contentDocument;
+  if (!doc?.body) return;
+  clearPreviewHighlight(doc);
+  const selectors = previewSelectors(activePreviewTarget);
+  if (!selectors.length) return;
+
+  let elements = selectors.flatMap((selector) => Array.from(doc.querySelectorAll(selector)));
+  if (!elements.length && ['options', 'notes', 'products'].includes(activePreviewTarget)) {
+    elements = Array.from(doc.querySelectorAll('[data-preview-block="items"]'));
+  }
+  const uniqueElements = [...new Set(elements)];
+  uniqueElements.forEach((element) => element.classList.add('preview-highlight'));
+
+  const firstElement = uniqueElements.find((element) => element !== doc.body) || uniqueElements[0];
+  if (shouldScroll && firstElement) {
+    firstElement.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function previewTargetForControl(control) {
+  const blockCard = control.closest('.block-card');
+  if (blockCard?.dataset.blockId) return `block:${blockCard.dataset.blockId}`;
+  return previewTargetByControl[control.id] || null;
+}
+
+function setActivePreviewTarget(control, shouldScroll = true) {
+  const target = previewTargetForControl(control);
+  if (!target) return;
+  activePreviewTarget = target;
+  applyPreviewHighlight({ shouldScroll });
+}
+
 async function updatePreview() {
   if (!printLayout) return;
   try {
     updatePreviewFrameSize();
     const html = await window.entregaiAgent.previewPrintLayout(activeProfile, printLayout);
+    printPreview.addEventListener('load', () => applyPreviewHighlight(), { once: true });
     printPreview.srcdoc = html;
   } catch (error) {
     showLayoutMessage(error.message || 'Não foi possível gerar o preview.', true);
@@ -425,6 +544,26 @@ borderWidth.addEventListener('change', () => updateLayout({ borderWidthPx: numbe
 dividerWidth.addEventListener('change', () => updateLayout({ dividerWidthPx: numberValue(dividerWidth) }));
 itemDividerWidth.addEventListener('change', () => updateLayout({ itemDividerWidthPx: numberValue(itemDividerWidth) }));
 
+layoutPanel.addEventListener('focusin', (event) => {
+  const control = event.target.closest('input, select, textarea, button[data-action]');
+  if (control) setActivePreviewTarget(control);
+});
+
+layoutPanel.addEventListener('click', (event) => {
+  const control = event.target.closest('input, select, textarea, button[data-action]');
+  if (control) setActivePreviewTarget(control);
+});
+
+layoutPanel.addEventListener('input', (event) => {
+  const control = event.target.closest('input, select, textarea');
+  if (control) setActivePreviewTarget(control, false);
+});
+
+layoutPanel.addEventListener('change', (event) => {
+  const control = event.target.closest('input, select, textarea');
+  if (control) setActivePreviewTarget(control, false);
+});
+
 footerText.addEventListener('input', () => {
   printLayout = clone(printLayout);
   printLayout[activeProfile] = {
@@ -481,6 +620,38 @@ resetLayoutButton.addEventListener('click', async () => {
     showLayoutMessage(error.message || 'Não foi possível restaurar o layout.', true);
   } finally {
     resetLayoutButton.disabled = false;
+  }
+});
+
+exportLayoutButton.addEventListener('click', async () => {
+  try {
+    exportLayoutButton.disabled = true;
+    const result = await window.entregaiAgent.exportPrintLayout(printLayout);
+    if (result?.layout) {
+      printLayout = result.layout;
+      renderLayoutForm();
+    }
+    if (!result?.canceled) showLayoutMessage('Arquivo de layout baixado.');
+  } catch (error) {
+    showLayoutMessage(error.message || 'Não foi possível baixar o layout.', true);
+  } finally {
+    exportLayoutButton.disabled = false;
+  }
+});
+
+importLayoutButton.addEventListener('click', async () => {
+  try {
+    importLayoutButton.disabled = true;
+    const result = await window.entregaiAgent.importPrintLayout();
+    if (result?.layout) {
+      printLayout = result.layout;
+      renderLayoutForm();
+    }
+    if (!result?.canceled) showLayoutMessage('Layout compartilhado aplicado.');
+  } catch (error) {
+    showLayoutMessage(error.message || 'Não foi possível usar o layout compartilhado.', true);
+  } finally {
+    importLayoutButton.disabled = false;
   }
 });
 
