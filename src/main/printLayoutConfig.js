@@ -1,5 +1,24 @@
 const TEXT_SIZES = ['small', 'normal', 'large', 'huge'];
 const ALIGNMENTS = ['left', 'center', 'right'];
+const CONFIGURABLE_ITEM_FONT_SCALES = ['compact', 'normal', 'large'];
+const OBSERVATION_STYLES = ['box', 'highlight', 'plain'];
+
+const DEFAULT_CONFIGURABLE_ITEMS = {
+  uppercase_product: true,
+  show_variation: true,
+  variation_label: 'TAMANHO',
+  uppercase_variation: true,
+  show_group_titles: true,
+  uppercase_group_titles: true,
+  uppercase_options: true,
+  show_fractions: true,
+  show_option_quantities: true,
+  show_configuration_divider: true,
+  observation_style: 'box',
+  observation_title: 'OBSERVAÇÃO',
+  uppercase_observation: true,
+  font_scale: 'normal',
+};
 
 const DEFAULT_PRINT_LAYOUT = {
   version: 1,
@@ -38,6 +57,7 @@ const DEFAULT_PRINT_LAYOUT = {
       boldOptions: false,
       highlightOptions: false,
     },
+    configurableItems: { ...DEFAULT_CONFIGURABLE_ITEMS },
     blocks: [
       { id: 'storeHeader', enabled: true, size: 'normal', bold: false, align: 'center' },
       { id: 'title', enabled: true, size: 'large', bold: true, align: 'center' },
@@ -84,6 +104,7 @@ const DEFAULT_PRINT_LAYOUT = {
       boldOptions: true,
       highlightOptions: true,
     },
+    configurableItems: { ...DEFAULT_CONFIGURABLE_ITEMS },
     blocks: [
       { id: 'title', enabled: true, size: 'huge', bold: true, align: 'center' },
       { id: 'kitchenMeta', enabled: true, size: 'large', bold: true, align: 'left' },
@@ -162,6 +183,33 @@ function normalizeBlock(block = {}, fallback = {}) {
   };
 }
 
+function normalizeConfigurableItems(input = {}, fallback = DEFAULT_CONFIGURABLE_ITEMS) {
+  const booleanValue = (field) => (
+    typeof input[field] === 'boolean' ? input[field] : fallback[field]
+  );
+
+  return {
+    uppercase_product: booleanValue('uppercase_product'),
+    show_variation: booleanValue('show_variation'),
+    variation_label: typeof input.variation_label === 'string' && input.variation_label.trim()
+      ? input.variation_label.trim().slice(0, 40)
+      : fallback.variation_label,
+    uppercase_variation: booleanValue('uppercase_variation'),
+    show_group_titles: booleanValue('show_group_titles'),
+    uppercase_group_titles: booleanValue('uppercase_group_titles'),
+    uppercase_options: booleanValue('uppercase_options'),
+    show_fractions: booleanValue('show_fractions'),
+    show_option_quantities: booleanValue('show_option_quantities'),
+    show_configuration_divider: booleanValue('show_configuration_divider'),
+    observation_style: validChoice(input.observation_style, OBSERVATION_STYLES, fallback.observation_style),
+    observation_title: typeof input.observation_title === 'string' && input.observation_title.trim()
+      ? input.observation_title.trim().slice(0, 40)
+      : fallback.observation_title,
+    uppercase_observation: booleanValue('uppercase_observation'),
+    font_scale: validChoice(input.font_scale, CONFIGURABLE_ITEM_FONT_SCALES, fallback.font_scale),
+  };
+}
+
 function normalizeProfile(input = {}, fallback) {
   const blocksById = new Map((Array.isArray(input.blocks) ? input.blocks : []).map((block) => [block.id, block]));
   const orderedIds = Array.isArray(input.blocks)
@@ -204,6 +252,7 @@ function normalizeProfile(input = {}, fallback) {
         ? input.itemOptions.highlightOptions
         : fallback.itemOptions.highlightOptions,
     },
+    configurableItems: normalizeConfigurableItems(input.configurableItems, fallback.configurableItems),
     blocks: ids.map((id) => normalizeBlock(blocksById.get(id), fallbackById.get(id))),
   };
 }

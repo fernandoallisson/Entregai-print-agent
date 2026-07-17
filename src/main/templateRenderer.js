@@ -39,7 +39,7 @@ const DEFAULT_CONFIGURABLE_ITEMS_LAYOUT = Object.freeze({
 function configurableItemsLayout(settings = {}) {
   return {
     ...DEFAULT_CONFIGURABLE_ITEMS_LAYOUT,
-    ...(settings?.configurable_items || {}),
+    ...(settings?.configurable_items || settings || {}),
   };
 }
 
@@ -109,12 +109,12 @@ function renderConfigurableItem(item, showPrices, layout, options = {}) {
   const showVariation = showOptions && layout.show_variation && item.nomeVariacao;
   const visibleGroups = showOptions ? groups : [];
   const hasDetails = showVariation || visibleGroups.length > 0;
-  const optionClass = layout.uppercase_options || options.uppercaseOptions ? ' uppercase' : '';
-  const showGroupTitles = layout.show_group_titles && options.showOptionGroups !== false;
-  const showQuantities = layout.show_option_quantities && options.showOptionQuantities !== false;
+  const optionClass = layout.uppercase_options ? ' uppercase' : '';
+  const showGroupTitles = layout.show_group_titles;
+  const showQuantities = layout.show_option_quantities;
   const prefix = text(options.optionPrefix);
   return `
-    <section class="item">
+    <section class="item configurable-item">
       <div class="row product">
         <span class="${layout.uppercase_product ? 'uppercase' : ''}">${escapeHtml(item.quantidade)}x ${escapeHtml(item.nomeProduto)}</span>
         ${showPrices ? `<span>R$ ${money(item.precoTotal)}</span>` : ''}
@@ -401,6 +401,11 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
   const borderWidth = showBorders ? cssNumber(layout.borderWidthPx, isKitchen ? 2 : 1) : 0;
   const dividerWidth = showBorders ? cssNumber(layout.dividerWidthPx, isKitchen ? 2 : 1) : 0;
   const itemDividerWidth = showBorders ? cssNumber(layout.itemDividerWidthPx, isKitchen ? 2 : 1) : 0;
+  const configurableFontScale = {
+    compact: 0.86,
+    normal: 1,
+    large: 1.18,
+  }[configurableLayout.font_scale] || 1;
 
   return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -464,6 +469,7 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
     .kitchen-meta p { font-size: calc(${metaFont}px * var(--block-scale)); line-height: 1.16; margin-bottom: ${lineGap}px; }
     .item { ${isKitchen ? `border-bottom: ${borderStyle(itemDividerWidth)}; padding-bottom: ${Math.max(0, itemGap - 1)}px;` : ''} margin-bottom: ${itemGap}px; }
     .product { font-size: calc(${productFont}px * var(--block-scale)); line-height: ${isKitchen ? 1.08 : 1.2}; margin-bottom: ${lineGap}px; font-weight: ${isKitchen ? 900 : 700}; }
+    .configurable-item .product { font-size: calc(${productFont * configurableFontScale}px * var(--block-scale)); }
     .product span, .option, .obs, .address-line, .cash-change, p {
       max-width: 100%;
       overflow-wrap: anywhere;
@@ -473,6 +479,8 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
     .option { ${highlightOptions ? `border: ${borderStyle(Math.max(borderWidth, 1))}; padding: ${Math.max(0, boxPadding - 3)}px;` : ''} font-size: calc(${optionFont}px * var(--block-scale)); line-height: ${isKitchen ? 1.1 : 1.2}; margin: 0 0 ${lineGap}px ${indent}px; font-weight: ${boldOptions ? 900 : 500}; ${isKitchen && !highlightOptions ? `padding-left: ${Math.max(0, indent - 4)}px; border-left: ${borderStyle(Math.max(borderWidth, 1))};` : ''} }
     .obs { ${isKitchen ? `border: ${borderStyle(borderWidth)}; padding: ${Math.max(0, boxPadding - 2)}px; margin: ${lineGap}px 0 ${itemGap}px 0;` : `margin: 0 0 ${lineGap}px ${indent}px;`} font-size: calc(${noteFont}px * var(--block-scale)); line-height: ${isKitchen ? 1.1 : 1.2}; font-style: italic; font-weight: 900; }
     .variation { margin: 0; font-size: calc(${optionFont}px * var(--block-scale)); line-height: 1.2; }
+    .configurable-item .variation,
+    .configurable-item .option-group { font-size: calc(${optionFont * configurableFontScale}px * var(--block-scale)); }
     .config-divider { border-top: ${borderStyle(dividerWidth, 'dashed')}; margin: ${Math.max(3, lineGap + 2)}px 0; }
     .option-group { margin: 0 0 ${Math.max(4, lineGap + 3)}px; font-size: calc(${optionFont}px * var(--block-scale)); }
     .group-title { margin: 0 0 ${lineGap}px; font-weight: 900; }
@@ -480,6 +488,7 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
     .config-option { ${highlightOptions ? `border: ${borderStyle(Math.max(borderWidth, 1))}; padding: ${Math.max(0, boxPadding - 3)}px;` : ''} display: flex; align-items: baseline; gap: 8px; margin: 0 0 ${lineGap}px; line-height: ${isKitchen ? 1.1 : 1.2}; font-weight: ${boldOptions ? 900 : 500}; }
     .fraction { display: inline-block; min-width: 1.35em; flex: 0 0 auto; font-size: 1.18em; font-weight: 900; }
     .config-observation { margin: ${Math.max(6, itemGap)}px 0 4px; font-size: calc(${noteFont}px * var(--block-scale)); line-height: 1.2; break-inside: avoid; page-break-inside: avoid; font-weight: 900; }
+    .configurable-item .config-observation { font-size: calc(${noteFont * configurableFontScale}px * var(--block-scale)); }
     .config-observation p { margin: 0; }
     .config-observation.box { border: ${borderStyle(Math.max(borderWidth, 1))}; padding: ${boxPadding}px; text-align: center; }
     .config-observation.highlight { border-left: ${borderStyle(Math.max(borderWidth, 3))}; padding: 3px 0 3px ${Math.max(6, indent - 4)}px; }
@@ -532,7 +541,7 @@ function renderBlockContent(blockId, context) {
     case 'items':
       return `<p class="bold">PRODUTOS:</p>${renderItems(payload.items || [], {
         ...profile.itemOptions,
-        layoutSettings: payload.printer?.layoutSettings,
+        layoutSettings: profile.configurableItems,
       }, isKitchen)}`;
     case 'totals':
       return isKitchen ? '' : renderTotals(payload.totals, typeLabel);
@@ -552,7 +561,7 @@ function renderJob(job, printLayoutConfig = {}) {
   const layout = normalizePrintLayoutConfig(printLayoutConfig);
   const profile = isKitchen ? layout.kitchen : layout.customer;
   const width = profile.paperWidthMm || payload.printer?.paperWidthMm || 80;
-  const itemLayout = configurableItemsLayout(payload.printer?.layoutSettings);
+  const itemLayout = configurableItemsLayout(profile.configurableItems);
   const order = payload.order || {};
   const store = payload.store || {};
   const code = ticketCode(order);

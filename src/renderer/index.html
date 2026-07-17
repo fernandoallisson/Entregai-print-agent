@@ -148,6 +148,52 @@
           </details>
 
           <details class="editor-section">
+            <summary>Produtos configuráveis</summary>
+            <div class="section-body">
+              <p class="section-hint">Personalize tamanhos, grupos, frações e observações neste tipo de cupom.</p>
+              <div class="configurable-fields">
+                <div class="field-row">
+                  <label for="variationLabel">Rótulo da variação</label>
+                  <input id="variationLabel" class="text-input" maxlength="40" />
+                </div>
+                <div class="field-row">
+                  <label for="configurableFontScale">Tamanho do texto</label>
+                  <select id="configurableFontScale">
+                    <option value="compact">Compacto</option>
+                    <option value="normal">Normal</option>
+                    <option value="large">Grande</option>
+                  </select>
+                </div>
+                <div class="field-row">
+                  <label for="observationTitle">Título da observação</label>
+                  <input id="observationTitle" class="text-input" maxlength="40" />
+                </div>
+                <div class="field-row">
+                  <label for="observationStyle">Estilo da observação</label>
+                  <select id="observationStyle">
+                    <option value="box">Caixa com borda</option>
+                    <option value="highlight">Destaque lateral</option>
+                    <option value="plain">Texto simples</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="options-box configurable-options">
+                <label class="check-line"><input id="uppercaseProduct" type="checkbox" /><span>Nome do produto em maiúsculas</span></label>
+                <label class="check-line"><input id="showVariation" type="checkbox" /><span>Exibir variação/tamanho</span></label>
+                <label class="check-line"><input id="uppercaseVariation" type="checkbox" /><span>Variação/tamanho em maiúsculas</span></label>
+                <label class="check-line"><input id="showGroupTitles" type="checkbox" /><span>Exibir títulos dos grupos</span></label>
+                <label class="check-line"><input id="uppercaseGroupTitles" type="checkbox" /><span>Títulos dos grupos em maiúsculas</span></label>
+                <label class="check-line"><input id="uppercaseConfigurableOptions" type="checkbox" /><span>Nomes das opções em maiúsculas</span></label>
+                <label class="check-line"><input id="showFractions" type="checkbox" /><span>Exibir frações</span></label>
+                <label class="check-line"><input id="showConfigurableOptionQuantities" type="checkbox" /><span>Exibir quantidades das opções</span></label>
+                <label class="check-line"><input id="showConfigurationDivider" type="checkbox" /><span>Separar detalhes com divisor</span></label>
+                <label class="check-line"><input id="uppercaseObservation" type="checkbox" /><span>Observação em maiúsculas</span></label>
+              </div>
+            </div>
+          </details>
+
+          <details class="editor-section">
             <summary>Adicionais</summary>
             <div class="section-body options-box flat">
               <label class="check-line">

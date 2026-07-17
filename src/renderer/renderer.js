@@ -36,6 +36,20 @@ const paperWidth = document.getElementById('paperWidth');
 const showPrices = document.getElementById('showPrices');
 const showOptions = document.getElementById('showOptions');
 const showNotes = document.getElementById('showNotes');
+const variationLabel = document.getElementById('variationLabel');
+const configurableFontScale = document.getElementById('configurableFontScale');
+const observationTitle = document.getElementById('observationTitle');
+const observationStyle = document.getElementById('observationStyle');
+const uppercaseProduct = document.getElementById('uppercaseProduct');
+const showVariation = document.getElementById('showVariation');
+const uppercaseVariation = document.getElementById('uppercaseVariation');
+const showGroupTitles = document.getElementById('showGroupTitles');
+const uppercaseGroupTitles = document.getElementById('uppercaseGroupTitles');
+const uppercaseConfigurableOptions = document.getElementById('uppercaseConfigurableOptions');
+const showFractions = document.getElementById('showFractions');
+const showConfigurableOptionQuantities = document.getElementById('showConfigurableOptionQuantities');
+const showConfigurationDivider = document.getElementById('showConfigurationDivider');
+const uppercaseObservation = document.getElementById('uppercaseObservation');
 const showOptionGroups = document.getElementById('showOptionGroups');
 const showOptionQuantities = document.getElementById('showOptionQuantities');
 const uppercaseOptions = document.getElementById('uppercaseOptions');
@@ -118,6 +132,20 @@ const previewTargetByControl = {
   showPrices: 'items',
   showOptions: 'options',
   showNotes: 'notes',
+  variationLabel: 'configurableItems',
+  configurableFontScale: 'configurableItems',
+  observationTitle: 'configurableItems',
+  observationStyle: 'configurableItems',
+  uppercaseProduct: 'configurableItems',
+  showVariation: 'configurableItems',
+  uppercaseVariation: 'configurableItems',
+  showGroupTitles: 'configurableItems',
+  uppercaseGroupTitles: 'configurableItems',
+  uppercaseConfigurableOptions: 'configurableItems',
+  showFractions: 'configurableItems',
+  showConfigurableOptionQuantities: 'configurableItems',
+  showConfigurationDivider: 'configurableItems',
+  uppercaseObservation: 'configurableItems',
   showOptionGroups: 'options',
   showOptionQuantities: 'options',
   uppercaseOptions: 'options',
@@ -155,6 +183,7 @@ const previewSelectorsByTarget = {
   boxes: ['.info-box', '.address-box', '.payment-box', '.ticket-number', '.kitchen-meta', '.tag'],
   dividers: ['.divider', '.solid'],
   items: ['[data-preview-block="items"]', '.item'],
+  configurableItems: ['.configurable-item'],
   products: ['.product'],
   options: ['.option'],
   notes: ['.obs'],
@@ -337,11 +366,26 @@ function renderLayoutForm() {
   const profile = currentProfile();
   const layout = profile.layout || {};
   const margins = layout.marginsMm || {};
+  const configurableItems = profile.configurableItems || {};
   updateTabs();
   paperWidth.value = String(profile.paperWidthMm || 80);
   showPrices.checked = Boolean(profile.itemOptions?.showPrices);
   showOptions.checked = profile.itemOptions?.showOptions !== false;
   showNotes.checked = profile.itemOptions?.showNotes !== false;
+  variationLabel.value = configurableItems.variation_label || '';
+  configurableFontScale.value = configurableItems.font_scale || 'normal';
+  observationTitle.value = configurableItems.observation_title || '';
+  observationStyle.value = configurableItems.observation_style || 'box';
+  uppercaseProduct.checked = configurableItems.uppercase_product !== false;
+  showVariation.checked = configurableItems.show_variation !== false;
+  uppercaseVariation.checked = configurableItems.uppercase_variation !== false;
+  showGroupTitles.checked = configurableItems.show_group_titles !== false;
+  uppercaseGroupTitles.checked = configurableItems.uppercase_group_titles !== false;
+  uppercaseConfigurableOptions.checked = configurableItems.uppercase_options !== false;
+  showFractions.checked = configurableItems.show_fractions !== false;
+  showConfigurableOptionQuantities.checked = configurableItems.show_option_quantities !== false;
+  showConfigurationDivider.checked = configurableItems.show_configuration_divider !== false;
+  uppercaseObservation.checked = configurableItems.uppercase_observation !== false;
   showOptionGroups.checked = profile.itemOptions?.showOptionGroups !== false;
   showOptionQuantities.checked = profile.itemOptions?.showOptionQuantities !== false;
   uppercaseOptions.checked = Boolean(profile.itemOptions?.uppercaseOptions);
@@ -393,6 +437,20 @@ function updateItemOptions(patch) {
       ...patch,
     },
   });
+}
+
+function updateConfigurableItems(patch, { render = true } = {}) {
+  const profile = currentProfile();
+  printLayout = clone(printLayout);
+  printLayout[activeProfile] = {
+    ...profile,
+    configurableItems: {
+      ...(profile.configurableItems || {}),
+      ...patch,
+    },
+  };
+  if (render) renderLayoutForm();
+  else schedulePreview();
 }
 
 function updateLayout(patch) {
@@ -597,6 +655,62 @@ showOptions.addEventListener('change', () => {
 
 showNotes.addEventListener('change', () => {
   updateItemOptions({ showNotes: showNotes.checked });
+});
+
+variationLabel.addEventListener('input', () => {
+  updateConfigurableItems({ variation_label: variationLabel.value }, { render: false });
+});
+
+configurableFontScale.addEventListener('change', () => {
+  updateConfigurableItems({ font_scale: configurableFontScale.value });
+});
+
+observationTitle.addEventListener('input', () => {
+  updateConfigurableItems({ observation_title: observationTitle.value }, { render: false });
+});
+
+observationStyle.addEventListener('change', () => {
+  updateConfigurableItems({ observation_style: observationStyle.value });
+});
+
+uppercaseProduct.addEventListener('change', () => {
+  updateConfigurableItems({ uppercase_product: uppercaseProduct.checked });
+});
+
+showVariation.addEventListener('change', () => {
+  updateConfigurableItems({ show_variation: showVariation.checked });
+});
+
+uppercaseVariation.addEventListener('change', () => {
+  updateConfigurableItems({ uppercase_variation: uppercaseVariation.checked });
+});
+
+showGroupTitles.addEventListener('change', () => {
+  updateConfigurableItems({ show_group_titles: showGroupTitles.checked });
+});
+
+uppercaseGroupTitles.addEventListener('change', () => {
+  updateConfigurableItems({ uppercase_group_titles: uppercaseGroupTitles.checked });
+});
+
+uppercaseConfigurableOptions.addEventListener('change', () => {
+  updateConfigurableItems({ uppercase_options: uppercaseConfigurableOptions.checked });
+});
+
+showFractions.addEventListener('change', () => {
+  updateConfigurableItems({ show_fractions: showFractions.checked });
+});
+
+showConfigurableOptionQuantities.addEventListener('change', () => {
+  updateConfigurableItems({ show_option_quantities: showConfigurableOptionQuantities.checked });
+});
+
+showConfigurationDivider.addEventListener('change', () => {
+  updateConfigurableItems({ show_configuration_divider: showConfigurationDivider.checked });
+});
+
+uppercaseObservation.addEventListener('change', () => {
+  updateConfigurableItems({ uppercase_observation: uppercaseObservation.checked });
 });
 
 showOptionGroups.addEventListener('change', () => {

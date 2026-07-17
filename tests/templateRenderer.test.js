@@ -47,7 +47,7 @@ test('respeita as preferências visuais recebidas da impressora', () => {
   });
 
   assert.match(html, /MODELO/);
-  assert.doesNotMatch(html, /group-title/);
+  assert.doesNotMatch(html, /<p class="group-title/);
   assert.match(html, /½/);
   assert.doesNotMatch(html, /50%/);
   assert.match(html, /config-observation plain/);
@@ -67,4 +67,36 @@ test('renderiza a comanda completa sem alterar itens simples', () => {
   assert.match(html, /Pedido:/);
   assert.match(html, /MESA 04/);
   assert.match(html, /1x Refrigerante/);
+});
+
+test('aplica no cupom o layout de produtos configuráveis salvo no agente', () => {
+  const html = renderJob({
+    document_type: 'ORDER_CUSTOMER',
+    payload: {
+      printer: {
+        paperWidthMm: 80,
+        layoutSettings: { configurable_items: { variation_label: 'CONFIGURAÇÃO ANTIGA' } },
+      },
+      order: { numeroPedido: '1843' },
+      items: [configurableItem],
+    },
+  }, {
+    customer: {
+      configurableItems: {
+        variation_label: 'MODELO LOCAL',
+        show_group_titles: false,
+        observation_title: 'RECADO',
+        observation_style: 'plain',
+        uppercase_observation: false,
+        font_scale: 'large',
+      },
+    },
+  });
+
+  assert.match(html, /MODELO LOCAL/);
+  assert.doesNotMatch(html, /CONFIGURAÇÃO ANTIGA/);
+  assert.doesNotMatch(html, /<p class="group-title/);
+  assert.match(html, /config-observation plain/);
+  assert.match(html, /RECADO/);
+  assert.match(html, /\.configurable-item \.product \{ font-size: calc\(16\.52px/);
 });
