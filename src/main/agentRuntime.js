@@ -10,7 +10,7 @@ class AgentRuntime {
     this.notifyStatus = notifyStatus;
     this.ledger = new Ledger();
     this.api = new ApiClient(() => this.credential?.token);
-    this.printerService = new PrinterService(mainWindowProvider);
+    this.printerService = new PrinterService(mainWindowProvider, () => this.store.readPrintLayout());
     this.running = false;
     this.backoffMs = 3000;
     this.credential = null;

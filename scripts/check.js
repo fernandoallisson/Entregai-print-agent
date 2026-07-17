@@ -5,6 +5,7 @@ const required = [
   'src/main/main.js',
   'src/main/apiClient.js',
   'src/main/agentRuntime.js',
+  'src/main/printLayoutConfig.js',
   'src/main/printerService.js',
   'src/preload/preload.js',
   'src/renderer/index.html',
