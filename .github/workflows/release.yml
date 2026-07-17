@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: print-agent-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: windows-latest
@@ -15,6 +19,8 @@ jobs:
     steps:
       - name: Baixar o código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -32,6 +38,15 @@ jobs:
           }
           if ("${{ github.ref_name }}" -ne $expectedTag) {
             throw "A tag ${{ github.ref_name }} não corresponde à versão $version do package.json."
+          }
+
+          $highestVersion = git tag --list 'v*' |
+            Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+            ForEach-Object { [version]$_.Substring(1) } |
+            Sort-Object -Descending |
+            Select-Object -First 1
+          if ([version]$version -ne $highestVersion) {
+            throw "A tag ${{ github.ref_name }} não é a maior versão do repositório ($highestVersion)."
           }
 
       - name: Instalar dependências
@@ -57,9 +72,10 @@ jobs:
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true
+          make_latest: true
           files: |
-            dist/Entregaí Print Agent Setup *.exe
-            dist/Entregaí Print Agent Setup *.exe.blockmap
+            dist/entregai-print-agent-setup-*.exe
+            dist/entregai-print-agent-setup-*.exe.blockmap
             dist/latest.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

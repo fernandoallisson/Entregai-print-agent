@@ -4,7 +4,7 @@ const path = require('path');
 function normalizeUpdateMetadata({ projectRoot = path.resolve(__dirname, '..') } = {}) {
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const outputDirectory = path.join(projectRoot, packageJson.build.directories?.output || 'dist');
-  const installerName = `${packageJson.build.productName} Setup ${packageJson.version}.exe`;
+  const installerName = `entregai-print-agent-setup-${packageJson.version}.exe`;
   const installerPath = path.join(outputDirectory, installerName);
   const metadataPath = path.join(outputDirectory, 'latest.yml');
 

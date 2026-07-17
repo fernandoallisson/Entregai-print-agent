@@ -85,15 +85,15 @@ Um `git push` comum não publica atualização. O workflow é iniciado somente p
 3. Confirme a aprovação das etapas de instalação, verificações, testes, build e validação dos artefatos.
 4. Acesse [Releases](https://github.com/fernandoallisson/Entregai-print-agent/releases).
 
-A Release deve conter exatamente os artefatos da versão:
+A Release deve conter exatamente os artefatos técnicos da versão:
 
 ```text
-Entregaí Print Agent Setup X.Y.Z.exe
-Entregaí Print Agent Setup X.Y.Z.exe.blockmap
+entregai-print-agent-setup-X.Y.Z.exe
+entregai-print-agent-setup-X.Y.Z.exe.blockmap
 latest.yml
 ```
 
-O `latest.yml` deve informar a mesma versão e o mesmo nome do instalador, além do hash SHA-512 correspondente. O workflow executa `npm run release:validate` antes de publicar.
+O nome técnico usa apenas caracteres que o GitHub preserva sem renomear o asset. Isso não altera o nome **Entregaí Print Agent** exibido pelo aplicativo e pelo instalador. O `latest.yml` deve informar a mesma versão e o mesmo nome técnico do instalador, além do hash SHA-512 correspondente. O workflow executa `npm run release:validate` antes de publicar e rejeita uma tag que não seja a maior versão existente no repositório.
 
 ## Verificar no agente
 
@@ -145,4 +145,3 @@ Exemplo: se `1.2.0` apresentar problema, publique a correção como `1.2.1`; nã
 - Instalar manualmente a primeira versão com atualizador em cada computador.
 - Adicionar futuramente os secrets de assinatura digital.
 - Manter o repositório público enquanto ele for usado diretamente como provedor de atualizações.
-

@@ -1,6 +1,6 @@
 {
   "name": "entregai-print-agent",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Entregaí Print Agent",
   "author": "Entregaí",
@@ -44,7 +44,7 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico",
-      "artifactName": "${productName} Setup ${version}.${ext}"
+      "artifactName": "entregai-print-agent-setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
