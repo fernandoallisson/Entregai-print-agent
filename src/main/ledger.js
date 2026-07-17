@@ -3,8 +3,8 @@ const path = require('path');
 const { app } = require('electron');
 
 class Ledger {
-  constructor() {
-    this.filePath = path.join(app.getPath('userData'), 'print-ledger.json');
+  constructor(filePath = null) {
+    this.filePath = filePath || path.join(app.getPath('userData'), 'print-ledger.json');
     this.entries = this.load();
   }
 
@@ -22,7 +22,9 @@ class Ledger {
 
   add(jobId) {
     this.entries.add(jobId);
-    fs.writeFileSync(this.filePath, JSON.stringify([...this.entries].slice(-1000), null, 2));
+    const temporaryPath = `${this.filePath}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify([...this.entries].slice(-1000), null, 2), { mode: 0o600 });
+    fs.renameSync(temporaryPath, this.filePath);
   }
 }
 

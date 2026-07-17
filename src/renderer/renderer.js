@@ -1,4 +1,9 @@
 const pairing = document.getElementById('pairing');
+const updatePanel = document.getElementById('updatePanel');
+const currentVersion = document.getElementById('currentVersion');
+const updateStatus = document.getElementById('updateStatus');
+const updateProgress = document.getElementById('updateProgress');
+const updateError = document.getElementById('updateError');
 const statusPanel = document.getElementById('status');
 const pairingCode = document.getElementById('pairingCode');
 const pairButton = document.getElementById('pairButton');
@@ -11,8 +16,18 @@ const deviceId = document.getElementById('deviceId');
 const agentName = document.getElementById('agentName');
 const printers = document.getElementById('printers');
 const lastSeen = document.getElementById('lastSeen');
+const backendAddress = document.getElementById('backendAddress');
+const transportName = document.getElementById('transportName');
 const mainPanel = document.getElementById('mainPanel');
 const layoutPanel = document.getElementById('layoutPanel');
+const connectionPanel = document.getElementById('connectionPanel');
+const connectionToggleButton = document.getElementById('connectionToggleButton');
+const backendUrl = document.getElementById('backendUrl');
+const agentEnvironment = document.getElementById('agentEnvironment');
+const printTransport = document.getElementById('printTransport');
+const saveConnectionButton = document.getElementById('saveConnectionButton');
+const cancelConnectionButton = document.getElementById('cancelConnectionButton');
+const connectionMessage = document.getElementById('connectionMessage');
 const layoutToggleButton = document.getElementById('layoutToggleButton');
 const closeLayoutButton = document.getElementById('closeLayoutButton');
 const customerTab = document.getElementById('customerTab');
@@ -89,6 +104,14 @@ let printLayout = null;
 let previewTimer = null;
 let layoutEditorOpen = false;
 let activePreviewTarget = null;
+let currentStatus = null;
+let connectionSettings = null;
+
+const transportLabels = {
+  auto: 'Automático',
+  websocket: 'WebSocket',
+  polling: 'Polling',
+};
 
 const previewTargetByControl = {
   paperWidth: 'document',
@@ -151,6 +174,7 @@ const previewSelectorsByTarget = {
 };
 
 function render(status) {
+  currentStatus = status;
   const paired = Boolean(status?.paired);
   pairing.classList.toggle('hidden', paired);
   statusPanel.classList.toggle('hidden', !paired);
@@ -159,13 +183,66 @@ function render(status) {
   agentName.textContent = status?.agent?.nome || status?.agent?.name || '-';
   printers.textContent = String(status?.printers ?? '-');
   lastSeen.textContent = status?.lastSeenAt ? new Date(status.lastSeenAt).toLocaleString('pt-BR') : '-';
+  const settings = status?.connectionSettings || connectionSettings;
+  if (settings) connectionSettings = settings;
+  backendAddress.textContent = settings?.apiBaseUrl || '-';
+  transportName.textContent = transportLabels[status?.transport || settings?.transport] || '-';
   statusDot.classList.toggle('online', paired && status?.running && !status?.lastError);
   statusText.textContent = status?.lastError || (paired ? 'Conectado' : 'Aguardando vinculação');
   if (status?.authFailed) message.textContent = 'Credencial revogada. Vincule este computador novamente.';
+  if (status?.connectionSaved) {
+    message.textContent = status?.requiresRePairing
+      ? 'Conexão salva. Como o ambiente mudou, vincule este computador novamente.'
+      : 'Configuração de conexão salva.';
+  }
 }
 
 async function refresh() {
   render(await window.entregaiAgent.getStatus());
+}
+
+function renderUpdateStatus(status) {
+  currentVersion.textContent = `Versão ${status?.currentVersion || '-'}`;
+  updateStatus.textContent = status?.message || 'Atualizações aguardando inicialização.';
+  updatePanel.classList.toggle('update-ready', Boolean(status?.ready));
+  updatePanel.classList.toggle('update-failed', status?.status === 'error');
+
+  const showProgress = Number.isFinite(status?.progress);
+  updateProgress.classList.toggle('hidden', !showProgress);
+  if (showProgress) updateProgress.value = status.progress;
+
+  updateError.classList.toggle('hidden', !status?.error);
+  updateError.textContent = status?.error ? `Detalhes: ${status.error}` : '';
+}
+
+async function loadUpdateStatus() {
+  try {
+    renderUpdateStatus(await window.entregaiAgent.getUpdateStatus());
+  } catch {
+    renderUpdateStatus({ message: 'Não foi possível consultar o estado das atualizações.' });
+  }
+}
+
+function fillConnectionForm(settings) {
+  connectionSettings = settings;
+  backendUrl.value = settings?.apiBaseUrl || '';
+  agentEnvironment.value = settings?.environment || 'development';
+  printTransport.value = settings?.transport || 'auto';
+}
+
+async function loadConnectionSettings() {
+  try {
+    fillConnectionForm(await window.entregaiAgent.getConnectionSettings());
+  } catch (error) {
+    connectionMessage.textContent = error.message || 'Não foi possível carregar a configuração de conexão.';
+  }
+}
+
+function setConnectionEditorOpen(open) {
+  connectionPanel.classList.toggle('hidden', !open);
+  connectionToggleButton.textContent = open ? 'Fechar configuração' : 'Configurar conexão';
+  connectionMessage.textContent = '';
+  if (open && connectionSettings) fillConnectionForm(connectionSettings);
 }
 
 function clone(value) {
@@ -454,6 +531,40 @@ clearButton.addEventListener('click', async () => {
   render(await window.entregaiAgent.clear());
 });
 
+connectionToggleButton.addEventListener('click', () => {
+  setConnectionEditorOpen(connectionPanel.classList.contains('hidden'));
+});
+
+cancelConnectionButton.addEventListener('click', () => {
+  setConnectionEditorOpen(false);
+});
+
+saveConnectionButton.addEventListener('click', async () => {
+  const proposed = {
+    apiBaseUrl: backendUrl.value,
+    environment: agentEnvironment.value,
+    transport: printTransport.value,
+  };
+  const environmentChanged = connectionSettings?.environment !== proposed.environment;
+  if (currentStatus?.paired && environmentChanged) {
+    const confirmed = confirm('A mudança de ambiente desvinculará este computador. Deseja continuar?');
+    if (!confirmed) return;
+  }
+
+  try {
+    saveConnectionButton.disabled = true;
+    connectionMessage.textContent = '';
+    const status = await window.entregaiAgent.saveConnectionSettings(proposed);
+    fillConnectionForm(status.connectionSettings);
+    render(status);
+    setConnectionEditorOpen(false);
+  } catch (error) {
+    connectionMessage.textContent = error.message || 'Não foi possível salvar a configuração de conexão.';
+  } finally {
+    saveConnectionButton.disabled = false;
+  }
+});
+
 layoutToggleButton.addEventListener('click', () => {
   setLayoutEditorOpen(!layoutEditorOpen);
 });
@@ -656,5 +767,8 @@ importLayoutButton.addEventListener('click', async () => {
 });
 
 window.entregaiAgent.onStatus(render);
+window.entregaiAgent.onUpdateStatus(renderUpdateStatus);
 refresh();
+loadUpdateStatus();
+loadConnectionSettings();
 loadPrintLayout();

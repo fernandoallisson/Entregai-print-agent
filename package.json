@@ -1,6 +1,6 @@
 {
   "name": "entregai-print-agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Entregaí Print Agent",
   "author": "Entregaí",
@@ -9,10 +9,13 @@
     "dev": "electron .",
     "build": "node scripts/check.js",
     "test": "node --test tests/*.test.js",
-    "dist:win": "electron-builder --win nsis"
+    "dist:win": "electron-builder --win nsis --publish never && node scripts/normalize-update-metadata.js",
+    "release:validate": "node scripts/validate-release.js"
   },
   "dependencies": {
-    "electron-log": "^5.4.3"
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "electron": "^37.2.0",
@@ -29,6 +32,14 @@
       "public/**/*",
       "build/**/*",
       "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "fernandoallisson",
+        "repo": "Entregai-print-agent",
+        "releaseType": "release"
+      }
     ],
     "win": {
       "target": "nsis",

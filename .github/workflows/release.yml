@@ -1,0 +1,65 @@
+name: Publicar atualização do Print Agent
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Validar tag e versão
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $expectedTag = "v$version"
+          if ("${{ github.ref_name }}" -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "A tag deve seguir o formato vX.Y.Z."
+          }
+          if ("${{ github.ref_name }}" -ne $expectedTag) {
+            throw "A tag ${{ github.ref_name }} não corresponde à versão $version do package.json."
+          }
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar verificações
+        run: npm run build
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Gerar instalador NSIS
+        run: npm run dist:win
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+
+      - name: Validar artefatos da atualização
+        run: npm run release:validate
+
+      - name: Publicar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/Entregaí Print Agent Setup *.exe
+            dist/Entregaí Print Agent Setup *.exe.blockmap
+            dist/latest.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

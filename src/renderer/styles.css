@@ -192,8 +192,98 @@ dd {
 
 .main-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.update-panel {
+  display: grid;
+  gap: 7px;
+  margin: -12px 0 20px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(248, 250, 252, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.update-panel.update-ready {
+  border-color: rgba(93, 207, 56, 0.55);
+  background: rgba(240, 253, 244, 0.94);
+}
+
+.update-panel.update-failed {
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.update-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#currentVersion {
+  flex: 0 0 auto;
+  color: var(--navy-strong);
+  font-weight: 800;
+}
+
+#updateStatus {
+  text-align: right;
+}
+
+#updateProgress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--blue);
+}
+
+.update-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.connection-panel {
+  margin-top: 20px;
+  border-top: 1px solid #dbe3ee;
+  padding-top: 20px;
+}
+
+.connection-heading {
+  margin-bottom: 16px;
+}
+
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.connection-grid .full-field {
+  grid-column: 1 / -1;
+}
+
+.connection-grid .hint {
+  margin: 0;
+}
+
+.connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.connection-message {
+  min-height: 18px;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .layout-panel {
@@ -587,6 +677,14 @@ button.icon-button:disabled {
 
   dl {
     grid-template-columns: 1fr;
+  }
+
+  .connection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-grid .full-field {
+    grid-column: auto;
   }
 
   .section-heading,

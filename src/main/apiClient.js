@@ -1,23 +1,30 @@
 const { getApiBaseUrl } = require('./config');
 
 class ApiClient {
-  constructor(tokenProvider) {
+  constructor(tokenProvider, connectionSettings = null) {
     this.tokenProvider = tokenProvider;
-    this.baseUrl = getApiBaseUrl();
+    this.baseUrl = getApiBaseUrl(connectionSettings);
+    this.sessionToken = null;
+  }
+
+  configure(connectionSettings) {
+    this.baseUrl = getApiBaseUrl(connectionSettings);
+    this.sessionToken = null;
   }
 
   async request(path, options = {}) {
+    const { useCredential = false, ...requestOptions } = options;
     const headers = {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...(requestOptions.headers || {}),
     };
-    const token = this.tokenProvider?.();
+    const token = useCredential ? this.tokenProvider?.() : (this.sessionToken || this.tokenProvider?.());
     if (token) headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
+      ...requestOptions,
       headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      body: requestOptions.body ? JSON.stringify(requestOptions.body) : undefined,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -33,6 +40,20 @@ class ApiClient {
     return this.request('/printing/agent/pair', { method: 'POST', body: payload });
   }
 
+  createSession() {
+    return this.request('/printing/agent/session', { method: 'POST', useCredential: true });
+  }
+
+  setSessionToken(token) {
+    this.sessionToken = token || null;
+  }
+
+  getWebSocketUrl() {
+    const url = new URL(`${this.baseUrl}/printing/agent/ws`);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return url.toString();
+  }
+
   heartbeat(payload = {}) {
     return this.request('/printing/agent/heartbeat', { method: 'POST', body: payload });
   }
@@ -41,8 +62,11 @@ class ApiClient {
     return this.request('/printing/agent/printers/sync', { method: 'POST', body: { printers } });
   }
 
-  claimJobs(limit = 1) {
-    return this.request('/printing/agent/jobs/claim', { method: 'POST', body: { limit } });
+  claimJobs(limit = 1, jobId = null) {
+    return this.request('/printing/agent/jobs/claim', {
+      method: 'POST',
+      body: { limit, ...(jobId ? { job_id: jobId } : {}) },
+    });
   }
 
   success(jobId, payload = {}) {

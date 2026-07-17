@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const os = require('os');
 const { app, safeStorage } = require('electron');
 const { DEFAULT_PRINT_LAYOUT, normalizePrintLayoutConfig } = require('./printLayoutConfig');
+const { getConnectionSettings, validateConnectionSettings } = require('./config');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -57,6 +58,16 @@ class SecureStore {
       ...config,
       ...patch,
     });
+  }
+
+  readConnectionSettings() {
+    return getConnectionSettings(this.readConfig().connection || null);
+  }
+
+  saveConnectionSettings(settings) {
+    const normalized = validateConnectionSettings(settings);
+    this.updateConfig({ connection: normalized });
+    return normalized;
   }
 
   saveCredential({ token, agent, environment }) {

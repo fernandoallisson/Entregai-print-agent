@@ -1,0 +1,67 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const normalizeUpdateMetadata = require('../scripts/normalize-update-metadata');
+
+const projectRoot = path.join(__dirname, '..');
+const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+const workflow = fs.readFileSync(path.join(projectRoot, '.github/workflows/release.yml'), 'utf8');
+const updateService = fs.readFileSync(path.join(projectRoot, 'src/main/updateService.js'), 'utf8');
+
+test('configura GitHub Releases público sem credencial no aplicativo', () => {
+  assert.equal(packageJson.dependencies['electron-updater'], '^6.6.2');
+  assert.deepEqual(packageJson.build.publish, [{
+    provider: 'github',
+    owner: 'fernandoallisson',
+    repo: 'Entregai-print-agent',
+    releaseType: 'release',
+  }]);
+  assert.doesNotMatch(updateService, /GH_TOKEN|GITHUB_TOKEN|github_pat_|service_role/i);
+});
+
+test('workflow publica somente por tag validada e inclui os três artefatos', () => {
+  assert.match(workflow, /tags:\s*\r?\n\s+- 'v\*\.\*\.\*'/);
+  assert.doesNotMatch(workflow, /workflow_dispatch/);
+  assert.match(workflow, /permissions:\s*\r?\n\s+contents: write/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm run release:validate/);
+  assert.match(workflow, /Setup \*\.exe/);
+  assert.match(workflow, /Setup \*\.exe\.blockmap/);
+  assert.match(workflow, /dist\/latest\.yml/);
+  assert.match(workflow, /github\.ref_name.*-ne \$expectedTag/);
+});
+
+test('serviço não solicita reinício ou downgrade automático', () => {
+  assert.doesNotMatch(updateService, /\.quitAndInstall\s*\(/);
+  assert.match(updateService, /autoInstallOnAppQuit = true/);
+  assert.match(updateService, /allowDowngrade = false/);
+});
+
+test('normaliza latest.yml para o nome real do asset publicado', () => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'entregai-release-'));
+  const dist = path.join(temporaryRoot, 'dist');
+  fs.mkdirSync(dist);
+  fs.writeFileSync(path.join(temporaryRoot, 'package.json'), JSON.stringify({
+    version: '1.2.3',
+    build: { productName: 'Entregaí Print Agent', directories: { output: 'dist' } },
+  }));
+  fs.writeFileSync(path.join(dist, 'Entregaí Print Agent Setup 1.2.3.exe'), 'installer');
+  fs.writeFileSync(path.join(dist, 'latest.yml'), [
+    'version: 1.2.3',
+    'files:',
+    '  - url: entregai-print-agent-setup-1.2.3.exe',
+    'path: entregai-print-agent-setup-1.2.3.exe',
+  ].join('\n'));
+
+  try {
+    normalizeUpdateMetadata({ projectRoot: temporaryRoot });
+    const metadata = fs.readFileSync(path.join(dist, 'latest.yml'), 'utf8');
+    assert.match(metadata, /url: Entregaí Print Agent Setup 1\.2\.3\.exe/);
+    assert.match(metadata, /path: Entregaí Print Agent Setup 1\.2\.3\.exe/);
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});

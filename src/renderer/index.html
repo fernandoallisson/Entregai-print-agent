@@ -18,6 +18,15 @@
         </div>
       </div>
 
+      <div id="updatePanel" class="update-panel" aria-live="polite">
+        <div class="update-summary">
+          <span id="currentVersion">Versão -</span>
+          <span id="updateStatus">Atualizações aguardando inicialização.</span>
+        </div>
+        <progress id="updateProgress" class="hidden" max="100" value="0"></progress>
+        <p id="updateError" class="update-error hidden"></p>
+      </div>
+
       <div id="pairing" class="pairing">
         <label for="pairingCode">Código de vinculação</label>
         <input id="pairingCode" inputmode="numeric" autocomplete="one-time-code" placeholder="784 291" maxlength="7" />
@@ -36,14 +45,58 @@
           <div><dt>Agente</dt><dd id="agentName">-</dd></div>
           <div><dt>Impressoras</dt><dd id="printers">-</dd></div>
           <div><dt>Última conexão</dt><dd id="lastSeen">-</dd></div>
+          <div><dt>Backend</dt><dd id="backendAddress">-</dd></div>
+          <div><dt>Transporte</dt><dd id="transportName">-</dd></div>
         </dl>
         <button id="clearButton" class="secondary">Desvincular este computador</button>
       </div>
 
       <p id="message" class="message"></p>
       <div class="main-actions">
+        <button id="connectionToggleButton" class="secondary" type="button">Configurar conexão</button>
         <button id="layoutToggleButton" class="secondary" type="button">Editar layout de impressão</button>
       </div>
+
+      <section id="connectionPanel" class="connection-panel hidden" aria-labelledby="connectionTitle">
+        <div class="connection-heading">
+          <div>
+            <h2 id="connectionTitle">Configuração de conexão</h2>
+            <p>Estes dados ficam salvos somente neste computador.</p>
+          </div>
+        </div>
+
+        <div class="connection-grid">
+          <div class="field-row full-field">
+            <label for="backendUrl">URL do backend</label>
+            <input id="backendUrl" class="text-input" type="url" autocomplete="url" placeholder="https://api.exemplo.com/api" />
+            <p class="hint">Informe o endereço completo terminado em <strong>/api</strong>. Não coloque tokens ou senhas.</p>
+          </div>
+
+          <div class="field-row">
+            <label for="agentEnvironment">Ambiente</label>
+            <select id="agentEnvironment">
+              <option value="production">Produção</option>
+              <option value="staging">Homologação</option>
+              <option value="development">Desenvolvimento</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <label for="printTransport">Transporte</label>
+            <select id="printTransport">
+              <option value="auto">Automático (recomendado)</option>
+              <option value="websocket">WebSocket</option>
+              <option value="polling">Polling de contingência</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="connection-actions">
+          <button id="saveConnectionButton" type="button">Salvar conexão</button>
+          <button id="cancelConnectionButton" class="secondary" type="button">Cancelar</button>
+        </div>
+        <p id="connectionMessage" class="connection-message" role="status"></p>
+      </section>
     </section>
 
     <section id="layoutPanel" class="panel layout-panel hidden">

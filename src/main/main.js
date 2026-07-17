@@ -4,11 +4,13 @@ const { app, BrowserWindow, ipcMain, dialog, Menu, Tray } = require('electron');
 const SecureStore = require('./secureStore');
 const { loadEnvFiles } = require('./envLoader');
 const AgentRuntime = require('./agentRuntime');
+const UpdateService = require('./updateService');
 const { renderJob } = require('./templateRenderer');
 const { normalizePrintLayoutConfig } = require('./printLayoutConfig');
 
 let mainWindow;
 let runtime;
+let updateService;
 let tray;
 let isQuitting = false;
 let closePromptOpen = false;
@@ -16,6 +18,12 @@ let closePromptOpen = false;
 function sendStatus(status) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('agent:status', status);
+  }
+}
+
+function sendUpdateStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update:status', status);
   }
 }
 
@@ -201,23 +209,46 @@ function previewJob(profile) {
   };
 }
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
+
+app.on('second-instance', showMainWindow);
+
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
   loadEnvFiles();
   const store = new SecureStore();
   createWindow();
   createTray();
   runtime = new AgentRuntime(store, () => mainWindow, sendStatus);
   runtime.start();
+  updateService = new UpdateService({
+    app,
+    environmentProvider: () => store.readConnectionSettings().environment,
+    notify: sendUpdateStatus,
+  });
+  updateService.start();
   mainWindow.webContents.once('did-finish-load', () => {
     askStartWithWindows(store);
   });
 
   ipcMain.handle('agent:get-status', () => runtime.status());
-  ipcMain.handle('agent:pair', async (event, pairingCode) => runtime.pair(pairingCode));
+  ipcMain.handle('agent:pair', async (_event, pairingCode) => {
+    const status = await runtime.pair(pairingCode);
+    updateService.refreshEligibility();
+    return status;
+  });
   ipcMain.handle('agent:clear', () => {
     runtime.clearCredential();
     return runtime.status();
   });
+  ipcMain.handle('connection-settings:get', () => store.readConnectionSettings());
+  ipcMain.handle('connection-settings:save', (_event, settings) => {
+    const status = runtime.updateConnectionSettings(settings);
+    updateService.refreshEligibility();
+    return status;
+  });
+  ipcMain.handle('update:get-status', () => updateService.getStatus());
   ipcMain.handle('print-layout:get', () => store.readPrintLayout());
   ipcMain.handle('print-layout:save', (_event, config) => store.savePrintLayout(config));
   ipcMain.handle('print-layout:reset', () => store.resetPrintLayout());
@@ -260,6 +291,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   runtime?.stop();
+  updateService?.stop();
 });
 
 app.on('activate', showMainWindow);
