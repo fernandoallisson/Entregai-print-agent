@@ -34,6 +34,29 @@ test('renderiza item configurável agrupado com observação em caixa', () => {
   assert.match(html, /OBSERVAÇÃO/);
 });
 
+test('imprime observação por adicional e destaca borda depois do tamanho', () => {
+  const html = renderItems([{
+    ...configurableItem,
+    selecoes: [
+      { nomeGrupo: 'Sabores', nomeOpcao: '4 Queijos', observacoes: 'sem cebola', quantidade: 1 },
+      { nomeGrupo: 'Adicionais', nomeOpcao: 'Borda recheada de catupiry', quantidade: 1 },
+    ],
+  }], false);
+
+  assert.match(html, /TAMANHO:<\/span> P • 4 fatias \(Com borda\)/);
+  assert.match(html, /4 Queijos - sem cebola/);
+  assert.match(html, /Borda recheada de catupiry/);
+});
+
+test('destaca borda ao lado do produto quando a variação está oculta', () => {
+  const html = renderItems([{
+    ...configurableItem,
+    selecoes: [{ nomeGrupo: 'Adicionais', nomeOpcao: 'BORDA cheddar', quantidade: 1 }],
+  }], false, { configurable_items: { show_variation: false } });
+
+  assert.match(html, /1x Pizza \(Com borda\)/);
+});
+
 test('respeita as preferências visuais recebidas da impressora', () => {
   const html = renderItems([configurableItem], false, {
     configurable_items: {

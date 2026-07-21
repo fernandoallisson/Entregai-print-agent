@@ -88,6 +88,20 @@ function groupSelections(selections = []) {
   return groups;
 }
 
+function selectionObservation(selection = {}) {
+  return text(selection.observacoes ?? selection.observacao ?? selection.notes);
+}
+
+function hasBorderSelection(item = {}) {
+  return (item.selecoes || []).some((selection) =>
+    text(selection?.nomeOpcao).toLocaleLowerCase('pt-BR').includes('borda')
+  );
+}
+
+function borderMarker(item = {}) {
+  return hasBorderSelection(item) ? ' (Com borda)' : '';
+}
+
 function renderObservation(value, layout) {
   if (!value) return '';
   const title = escapeHtml(layout.observation_title);
@@ -107,6 +121,7 @@ function renderConfigurableItem(item, showPrices, layout, options = {}) {
   const showOptions = options.showOptions !== false;
   const showNotes = options.showNotes !== false;
   const showVariation = showOptions && layout.show_variation && item.nomeVariacao;
+  const markerAfterVariation = Boolean(showVariation);
   const visibleGroups = showOptions ? groups : [];
   const hasDetails = showVariation || visibleGroups.length > 0;
   const optionClass = layout.uppercase_options ? ' uppercase' : '';
@@ -116,10 +131,10 @@ function renderConfigurableItem(item, showPrices, layout, options = {}) {
   return `
     <section class="item configurable-item">
       <div class="row product">
-        <span class="${layout.uppercase_product ? 'uppercase' : ''}">${escapeHtml(item.quantidade)}x ${escapeHtml(item.nomeProduto)}</span>
+        <span class="${layout.uppercase_product ? 'uppercase' : ''}">${escapeHtml(item.quantidade)}x ${escapeHtml(item.nomeProduto)}${markerAfterVariation ? '' : escapeHtml(borderMarker(item))}</span>
         ${showPrices ? `<span>R$ ${money(item.precoTotal)}</span>` : ''}
       </div>
-      ${showVariation ? `<p class="variation${layout.uppercase_variation ? ' uppercase' : ''}"><span class="bold">${escapeHtml(layout.variation_label)}:</span> ${escapeHtml(item.nomeVariacao)}</p>` : ''}
+      ${showVariation ? `<p class="variation${layout.uppercase_variation ? ' uppercase' : ''}"><span class="bold">${escapeHtml(layout.variation_label)}:</span> ${escapeHtml(item.nomeVariacao)}${escapeHtml(borderMarker(item))}</p>` : ''}
       ${hasDetails && layout.show_configuration_divider ? '<div class="config-divider"></div>' : ''}
       ${visibleGroups.map((group) => `
         <div class="option-group">
@@ -129,7 +144,8 @@ function renderConfigurableItem(item, showPrices, layout, options = {}) {
             const quantity = showQuantities && Number(selection.quantidade) > 1
               ? `${escapeHtml(selection.quantidade)}x `
               : '';
-            return `<p class="config-option${optionClass}">${fraction ? `<span class="fraction">${fraction}</span>` : ''}<span>${prefix ? `${escapeHtml(prefix)} ` : ''}${quantity}${escapeHtml(selection.nomeOpcao)}</span></p>`;
+            const observation = selectionObservation(selection);
+            return `<p class="config-option${optionClass}">${fraction ? `<span class="fraction">${fraction}</span>` : ''}<span>${prefix ? `${escapeHtml(prefix)} ` : ''}${quantity}${escapeHtml(selection.nomeOpcao)}${observation ? ` - ${escapeHtml(observation)}` : ''}</span></p>`;
           }).join('')}
         </div>
       `).join('')}
@@ -161,10 +177,13 @@ function ticketCode(order = {}) {
 }
 
 function itemName(item = {}) {
-  return text(item.displayName) ||
+  const name = text(item.displayName) ||
     [text(item.nomeProduto) || 'Produto', text(item.nomeVariacao)]
       .filter(Boolean)
       .join(' - ');
+  return hasBorderSelection(item) && !name.toLocaleLowerCase('pt-BR').includes('(com borda)')
+    ? `${name}${borderMarker(item)}`
+    : name;
 }
 
 function formatOptionLine(line, options = {}) {
@@ -184,7 +203,8 @@ function selectionLine(selection = {}, options = {}) {
     ].filter(Boolean).join(', ');
   const group = options.showOptionGroups === false ? '' : text(selection.nomeGrupo);
   const option = text(selection.nomeOpcao) || 'Opção';
-  return formatOptionLine(`${group ? `${group}: ` : ''}${option}${suffix ? ` (${suffix})` : ''}`, options);
+  const observation = selectionObservation(selection);
+  return formatOptionLine(`${group ? `${group}: ` : ''}${option}${observation ? ` - ${observation}` : ''}${suffix ? ` (${suffix})` : ''}`, options);
 }
 
 function configurationLines(item = {}, options = {}) {
