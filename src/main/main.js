@@ -248,6 +248,7 @@ app.whenReady().then(() => {
     updateService.refreshEligibility();
     return status;
   });
+  ipcMain.handle('agent:resume', () => runtime.resume());
   ipcMain.handle('agent:clear', () => {
     runtime.clearCredential();
     return runtime.status();

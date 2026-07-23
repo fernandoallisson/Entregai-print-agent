@@ -48,6 +48,10 @@ class ApiClient {
     return this.request('/printing/agent/realtime-session', { method: 'POST', useCredential: true });
   }
 
+  resume() {
+    return this.request('/printing/agent/resume', { method: 'POST', useCredential: true });
+  }
+
   setSessionToken(token) {
     this.sessionToken = token || null;
   }

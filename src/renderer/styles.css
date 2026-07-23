@@ -163,6 +163,22 @@ button.secondary {
   background: var(--green);
 }
 
+.operational-details {
+  margin: -8px 0 18px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.resume-action {
+  margin-right: 8px;
+  background: linear-gradient(135deg, #15803d, #16a34a);
+}
+
 dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

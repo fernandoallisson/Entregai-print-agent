@@ -91,14 +91,18 @@ class PrintRealtimeClient {
     });
   }
 
-  async disconnect() {
+  async disconnect({ clearSession = false } = {}) {
     this.setConnected(false, { status: 'CLOSED' });
     if (this.client && this.channel) {
       await this.client.removeChannel(this.channel).catch(() => undefined);
     }
+    if (clearSession && this.client?.auth) {
+      await this.client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    }
     this.client?.auth?.stopAutoRefresh?.();
     this.channel = null;
     this.client = null;
+    if (clearSession) this.store.clearRealtimeStorage?.();
   }
 }
 

@@ -7,10 +7,12 @@ const updateError = document.getElementById('updateError');
 const statusPanel = document.getElementById('status');
 const pairingCode = document.getElementById('pairingCode');
 const pairButton = document.getElementById('pairButton');
+const resumeButton = document.getElementById('resumeButton');
 const clearButton = document.getElementById('clearButton');
 const message = document.getElementById('message');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
+const operationalDetails = document.getElementById('operationalDetails');
 const deviceName = document.getElementById('deviceName');
 const deviceId = document.getElementById('deviceId');
 const agentName = document.getElementById('agentName');
@@ -216,8 +218,15 @@ function render(status) {
   if (settings) connectionSettings = settings;
   backendAddress.textContent = settings?.apiBaseUrl || '-';
   transportName.textContent = transportLabels[status?.transport || settings?.transport] || '-';
-  statusDot.classList.toggle('online', paired && status?.running && !status?.lastError);
-  statusText.textContent = status?.lastError || (paired ? 'Conectado' : 'Aguardando vinculação');
+  const suspended = Boolean(status?.suspended);
+  statusDot.classList.toggle('online', paired && status?.runtimeState === 'active' && !status?.lastError);
+  statusText.textContent = status?.lastError
+    || status?.statusMessage
+    || (paired ? 'Conectado' : 'Aguardando vinculação');
+  operationalDetails.classList.toggle('hidden', !suspended && !status?.forceActiveUntil);
+  operationalDetails.textContent = status?.operationalDetails || '';
+  resumeButton.classList.toggle('hidden', !paired || !suspended);
+  resumeButton.disabled = Boolean(status?.resuming);
   if (status?.authFailed) message.textContent = 'Credencial revogada. Vincule este computador novamente.';
   if (status?.connectionSaved) {
     message.textContent = status?.requiresRePairing
@@ -581,6 +590,18 @@ pairButton.addEventListener('click', async () => {
     message.textContent = error.message || 'Não foi possível vincular este computador.';
   } finally {
     pairButton.disabled = false;
+  }
+});
+
+resumeButton.addEventListener('click', async () => {
+  try {
+    message.textContent = '';
+    resumeButton.disabled = true;
+    render(await window.entregaiAgent.resume());
+  } catch (error) {
+    message.textContent = error.message || 'Não foi possível retomar o agente de impressão.';
+  } finally {
+    resumeButton.disabled = false;
   }
 });
 

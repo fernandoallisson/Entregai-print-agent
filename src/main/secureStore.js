@@ -71,6 +71,29 @@ class SecureStore {
     return normalized;
   }
 
+  readOperationalOverrideUntil() {
+    const value = this.readConfig().operationalOverrideUntil;
+    if (!value || !Number.isFinite(Date.parse(value))) return null;
+    return value;
+  }
+
+  saveOperationalOverrideUntil(value) {
+    if (!value || !Number.isFinite(Date.parse(value))) {
+      this.clearOperationalOverride();
+      return null;
+    }
+    const normalized = new Date(value).toISOString();
+    this.updateConfig({ operationalOverrideUntil: normalized });
+    return normalized;
+  }
+
+  clearOperationalOverride() {
+    const config = this.readConfig();
+    if (!Object.prototype.hasOwnProperty.call(config, 'operationalOverrideUntil')) return;
+    delete config.operationalOverrideUntil;
+    this.writeJson(this.configPath, config);
+  }
+
   saveCredential({ token, agent, environment }) {
     const encrypted = safeStorage.isEncryptionAvailable()
       ? safeStorage.encryptString(token).toString('base64')
@@ -100,6 +123,7 @@ class SecureStore {
     } catch {
       // Credencial ausente.
     }
+    this.clearOperationalOverride();
     this.clearRealtimeStorage();
   }
 

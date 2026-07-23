@@ -31,6 +31,9 @@ const makeRuntime = ({ jobs = [] } = {}) => {
   };
   const configuredConnections = [];
   const realtimeConnections = [];
+  const realtimeDisconnects = [];
+  const heartbeats = [];
+  let operationalOverrideUntil = null;
   const api = {
     pair: async () => ({
       token: 'epa_paired',
@@ -46,8 +49,9 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     success: async (jobId) => succeeded.push(jobId),
     failure: async () => undefined,
     syncPrinters: async (printers) => synced.push(printers),
-    heartbeat: async () => undefined,
+    heartbeat: async (payload) => heartbeats.push(payload),
     createSession: async () => ({ access_token: 'session', transport: 'polling' }),
+    resume: async () => ({ access_token: 'session', transport: 'polling' }),
     createRealtimeSession: async () => ({
       transport: 'supabase_realtime',
       url: 'https://project.supabase.co',
@@ -72,7 +76,7 @@ const makeRuntime = ({ jobs = [] } = {}) => {
       realtimeConnections.push(config);
       return true;
     },
-    disconnect: async () => undefined,
+    disconnect: async (options) => realtimeDisconnects.push(options || {}),
   };
   const store = {
     readCredential: () => credential,
@@ -83,6 +87,13 @@ const makeRuntime = ({ jobs = [] } = {}) => {
       connectionSettings = settings;
       return connectionSettings;
     },
+    readOperationalOverrideUntil: () => operationalOverrideUntil,
+    saveOperationalOverrideUntil: (value) => {
+      operationalOverrideUntil = value;
+      return value;
+    },
+    clearOperationalOverride: () => { operationalOverrideUntil = null; },
+    clearRealtimeStorage: () => undefined,
     getDeviceId: () => 'device-1',
     getDeviceName: () => 'Caixa',
     readPrintLayout: () => ({}),
@@ -94,6 +105,7 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     realtime,
   });
   runtime.running = true;
+  runtime.runtimeState = AgentRuntime.RUNTIME_STATES.ACTIVE;
   runtime.credential = store.readCredential();
   runtime.session = { access_token: 'session', transport: 'polling' };
   return {
@@ -102,7 +114,12 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     succeeded,
     synced,
     configuredConnections,
+    api,
+    heartbeats,
+    realtimeDisconnects,
     realtimeConnections,
+    store,
+    getOperationalOverrideUntil: () => operationalOverrideUntil,
   };
 };
 
@@ -174,6 +191,70 @@ test('falha do tempo real mantém o runtime apto ao polling de contingência', a
   assert.equal(connected, false);
   assert.equal(runtime.reconciliationRequested, true);
   assert.ok(runtime.reconnectTimer);
+  runtime.stop();
+});
+
+test('evento de pausa suspende chamadas operacionais e limpa sessão Realtime local', async () => {
+  const { runtime, realtimeDisconnects, heartbeats } = makeRuntime();
+  runtime.transport = 'supabase_realtime';
+  runtime.session = { access_token: 'session', transport: 'supabase_realtime' };
+
+  runtime.handleRealtimeMessage({ type: 'PRINT_AGENT_PAUSED', print_agent_id: 'agent-1' });
+  await runtime.suspensionPromise;
+  runtime.requestJob('job-after-pause');
+  await runtime.drainJobs();
+  await runtime.heartbeat();
+
+  assert.equal(runtime.runtimeState, AgentRuntime.RUNTIME_STATES.SUSPENDED_INACTIVE);
+  assert.deepEqual(realtimeDisconnects.at(-1), { clearSession: true });
+  assert.equal(heartbeats.length, 0);
+  runtime.stop();
+});
+
+test('retomada local fora do horário persiste exceção até o próximo fechamento', async () => {
+  const nextClose = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const { runtime, api, getOperationalOverrideUntil, heartbeats } = makeRuntime();
+  api.resume = async () => ({
+    access_token: 'session',
+    transport: 'polling',
+    operational: {
+      agent_active: true,
+      within_business_hours: false,
+      should_run: false,
+      next_close_at: nextClose,
+    },
+  });
+  runtime.runtimeState = AgentRuntime.RUNTIME_STATES.SUSPENDED_SCHEDULE;
+
+  await runtime.resume();
+
+  assert.equal(runtime.runtimeState, AgentRuntime.RUNTIME_STATES.ACTIVE);
+  assert.equal(getOperationalOverrideUntil(), nextClose);
+  assert.equal(heartbeats.length, 1);
+  runtime.stop();
+});
+
+test('retomada dentro da tolerância operacional não cria exceção local', async () => {
+  const nextClose = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+  const { runtime, api, getOperationalOverrideUntil, heartbeats } = makeRuntime();
+  api.resume = async () => ({
+    access_token: 'session',
+    transport: 'polling',
+    operational: {
+      agent_active: true,
+      within_business_hours: false,
+      within_operational_grace: true,
+      should_run: true,
+      next_close_at: nextClose,
+    },
+  });
+  runtime.runtimeState = AgentRuntime.RUNTIME_STATES.SUSPENDED_SCHEDULE;
+
+  await runtime.resume();
+
+  assert.equal(runtime.runtimeState, AgentRuntime.RUNTIME_STATES.ACTIVE);
+  assert.equal(getOperationalOverrideUntil(), null);
+  assert.equal(heartbeats.length, 1);
   runtime.stop();
 });
 

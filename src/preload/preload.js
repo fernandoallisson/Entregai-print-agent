@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('entregaiAgent', {
   getStatus: () => ipcRenderer.invoke('agent:get-status'),
   pair: (pairingCode) => ipcRenderer.invoke('agent:pair', pairingCode),
+  resume: () => ipcRenderer.invoke('agent:resume'),
   clear: () => ipcRenderer.invoke('agent:clear'),
   getConnectionSettings: () => ipcRenderer.invoke('connection-settings:get'),
   saveConnectionSettings: (settings) => ipcRenderer.invoke('connection-settings:save', settings),
