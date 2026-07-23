@@ -44,14 +44,12 @@ class ApiClient {
     return this.request('/printing/agent/session', { method: 'POST', useCredential: true });
   }
 
-  setSessionToken(token) {
-    this.sessionToken = token || null;
+  createRealtimeSession() {
+    return this.request('/printing/agent/realtime-session', { method: 'POST', useCredential: true });
   }
 
-  getWebSocketUrl() {
-    const url = new URL(`${this.baseUrl}/printing/agent/ws`);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    return url.toString();
+  setSessionToken(token) {
+    this.sessionToken = token || null;
   }
 
   heartbeat(payload = {}) {

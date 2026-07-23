@@ -1,6 +1,6 @@
 {
   "name": "entregai-print-agent",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "private": true,
   "description": "Entregaí Print Agent",
   "author": "Entregaí",
@@ -13,9 +13,9 @@
     "release:validate": "node scripts/validate-release.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.110.8",
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.6.2",
-    "ws": "^8.18.0"
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "electron": "^37.2.0",

@@ -1,5 +1,7 @@
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const INITIAL_CHECK_DELAY_MS = 15 * 1000;
+const INSTALL_IDLE_MS = 60 * 1000;
+const INSTALL_CHECK_INTERVAL_MS = 5 * 1000;
 
 function safeErrorMessage(error) {
   return String(error?.message || 'Falha desconhecida ao verificar atualizações')
@@ -15,8 +17,12 @@ class UpdateService {
     autoUpdater = null,
     logger = null,
     logEvent = null,
+    idleProvider = () => true,
+    beforeInstall = () => undefined,
     initialCheckDelayMs = INITIAL_CHECK_DELAY_MS,
     checkIntervalMs = CHECK_INTERVAL_MS,
+    installIdleMs = INSTALL_IDLE_MS,
+    installCheckIntervalMs = INSTALL_CHECK_INTERVAL_MS,
   }) {
     this.app = app;
     this.environmentProvider = environmentProvider;
@@ -24,12 +30,18 @@ class UpdateService {
     this.autoUpdater = autoUpdater;
     this.logger = logger;
     this.logEvent = logEvent;
+    this.idleProvider = idleProvider;
+    this.beforeInstall = beforeInstall;
     this.initialCheckDelayMs = initialCheckDelayMs;
     this.checkIntervalMs = checkIntervalMs;
+    this.installIdleMs = installIdleMs;
+    this.installCheckIntervalMs = installCheckIntervalMs;
     this.active = false;
     this.listenersAttached = false;
     this.initialTimer = null;
     this.intervalTimer = null;
+    this.installTimer = null;
+    this.idleSince = null;
     this.checkPromise = null;
     this.lastProgressBucket = -1;
     this.state = {
@@ -130,12 +142,13 @@ class UpdateService {
       this.logEvent('UPDATE_DOWNLOADED', { version: info.version });
       this.publish({
         status: 'downloaded',
-        message: 'Atualização pronta. Ela será instalada quando o aplicativo for encerrado normalmente.',
+        message: 'Atualização pronta. O agente reiniciará quando não houver impressão em andamento.',
         availableVersion: info.version || this.state.availableVersion,
         progress: 100,
         ready: true,
         error: null,
       });
+      this.scheduleAutomaticInstall();
     });
 
     this.autoUpdater.on('error', (error) => this.handleError(error));
@@ -208,11 +221,50 @@ class UpdateService {
     return this.checkPromise;
   }
 
+  scheduleAutomaticInstall() {
+    if (this.installTimer) return;
+    this.idleSince = null;
+    this.installTimer = setInterval(
+      () => this.checkAutomaticInstall(),
+      this.installCheckIntervalMs,
+    );
+    this.installTimer.unref?.();
+  }
+
+  checkAutomaticInstall(now = Date.now()) {
+    if (!this.active || !this.state.ready) return false;
+    if (!this.idleProvider()) {
+      this.idleSince = null;
+      return false;
+    }
+
+    if (this.idleSince === null) {
+      this.idleSince = now;
+      return false;
+    }
+    if (now - this.idleSince < this.installIdleMs) return false;
+
+    if (this.installTimer) clearInterval(this.installTimer);
+    this.installTimer = null;
+    this.logEvent?.('UPDATE_INSTALLING', { version: this.state.availableVersion });
+    this.publish({
+      status: 'installing',
+      message: 'Instalando atualização e reiniciando o agente...',
+      progress: 100,
+    });
+    this.beforeInstall();
+    this.autoUpdater.quitAndInstall(false, true);
+    return true;
+  }
+
   stopTimers() {
     if (this.initialTimer) clearTimeout(this.initialTimer);
     if (this.intervalTimer) clearInterval(this.intervalTimer);
+    if (this.installTimer) clearInterval(this.installTimer);
     this.initialTimer = null;
     this.intervalTimer = null;
+    this.installTimer = null;
+    this.idleSince = null;
   }
 
   stop() {
@@ -223,4 +275,3 @@ class UpdateService {
 
 module.exports = UpdateService;
 module.exports.safeErrorMessage = safeErrorMessage;
-

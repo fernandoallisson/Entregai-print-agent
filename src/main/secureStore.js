@@ -16,6 +16,7 @@ class SecureStore {
     ensureDir(this.dir);
     this.configPath = path.join(this.dir, 'config.json');
     this.credentialPath = path.join(this.dir, 'credential.json');
+    this.realtimeStoragePath = path.join(this.dir, 'realtime-session.json');
     this.printLayoutPath = path.join(this.dir, 'print-layout.json');
   }
 
@@ -98,6 +99,50 @@ class SecureStore {
       fs.unlinkSync(this.credentialPath);
     } catch {
       // Credencial ausente.
+    }
+    this.clearRealtimeStorage();
+  }
+
+  readRealtimeStorageValue(key) {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    const entries = this.readJson(this.realtimeStoragePath, {});
+    if (!entries[key]) return null;
+    try {
+      return safeStorage.decryptString(Buffer.from(entries[key], 'base64'));
+    } catch {
+      return null;
+    }
+  }
+
+  saveRealtimeStorageValue(key, value) {
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    const entries = this.readJson(this.realtimeStoragePath, {});
+    entries[key] = safeStorage.encryptString(String(value)).toString('base64');
+    this.writeJson(this.realtimeStoragePath, entries);
+    return true;
+  }
+
+  removeRealtimeStorageValue(key) {
+    const entries = this.readJson(this.realtimeStoragePath, {});
+    if (!Object.prototype.hasOwnProperty.call(entries, key)) return;
+    delete entries[key];
+    if (Object.keys(entries).length) this.writeJson(this.realtimeStoragePath, entries);
+    else this.clearRealtimeStorage();
+  }
+
+  createRealtimeStorage() {
+    return {
+      getItem: (key) => this.readRealtimeStorageValue(key),
+      setItem: (key, value) => this.saveRealtimeStorageValue(key, value),
+      removeItem: (key) => this.removeRealtimeStorageValue(key),
+    };
+  }
+
+  clearRealtimeStorage() {
+    try {
+      fs.unlinkSync(this.realtimeStoragePath);
+    } catch {
+      // Sessão Realtime ausente.
     }
   }
 

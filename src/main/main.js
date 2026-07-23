@@ -220,12 +220,22 @@ app.whenReady().then(() => {
   const store = new SecureStore();
   createWindow();
   createTray();
-  runtime = new AgentRuntime(store, () => mainWindow, sendStatus);
+  runtime = new AgentRuntime(store, () => mainWindow, sendStatus, {
+    reconciliationIntervalMs: AgentRuntime.resolveReconciliationIntervalMs({
+      isPackaged: app.isPackaged,
+      value: process.env.ENTREGAI_POLLING_INTERVAL_MS,
+    }),
+  });
   runtime.start();
   updateService = new UpdateService({
     app,
     environmentProvider: () => store.readConnectionSettings().environment,
     notify: sendUpdateStatus,
+    idleProvider: () => runtime?.isIdleForUpdate() ?? false,
+    beforeInstall: () => {
+      isQuitting = true;
+      runtime?.stop();
+    },
   });
   updateService.start();
   mainWindow.webContents.once('did-finish-load', () => {

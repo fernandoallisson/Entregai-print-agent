@@ -37,6 +37,8 @@ function loadEnvFile(filePath) {
 
 function loadEnvFiles() {
   const candidates = [
+    path.join(process.cwd(), '.env.local'),
+    path.join(app.getAppPath(), '.env.local'),
     path.join(process.cwd(), '.env'),
     path.join(app.getAppPath(), '.env'),
   ];

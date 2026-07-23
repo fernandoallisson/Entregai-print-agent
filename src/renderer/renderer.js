@@ -123,8 +123,8 @@ let connectionSettings = null;
 
 const transportLabels = {
   auto: 'Automático',
-  websocket: 'WebSocket',
-  polling: 'Polling',
+  supabase_realtime: 'Tempo real seguro',
+  polling: 'Polling de contingência',
 };
 
 const previewTargetByControl = {

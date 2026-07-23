@@ -1,19 +1,29 @@
 const os = require('os');
-const WebSocket = require('ws');
 const ApiClient = require('./apiClient');
 const Ledger = require('./ledger');
+const PrintRealtimeClient = require('./printRealtimeClient');
 const PrinterService = require('./printerService');
 const { getConnectionSettings, getPrintTransport } = require('./config');
 const { printerFingerprint } = require('./printerInventory');
 const { event } = require('./logger');
 
 const HEARTBEAT_INTERVAL_MS = 60 * 1000;
-const RECONCILIATION_INTERVAL_MS = 60 * 1000;
+const RECONCILIATION_INTERVAL_MS = 3 * 60 * 1000;
+const MIN_LOCAL_RECONCILIATION_INTERVAL_MS = 3 * 1000;
 const PRINTER_SCAN_INTERVAL_MS = 60 * 1000;
 const PRINTER_SAFETY_SYNC_MS = 15 * 60 * 1000;
 const SESSION_RENEWAL_MS = 4 * 60 * 1000;
 const RETRY_JOB_DELAY_MS = 3000;
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
+
+function resolveReconciliationIntervalMs({ isPackaged = true, value } = {}) {
+  if (isPackaged) return RECONCILIATION_INTERVAL_MS;
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isInteger(parsed) || parsed < MIN_LOCAL_RECONCILIATION_INTERVAL_MS) {
+    return RECONCILIATION_INTERVAL_MS;
+  }
+  return parsed;
+}
 
 class AgentRuntime {
   constructor(store, mainWindowProvider, notifyStatus, dependencies = {}) {
@@ -22,13 +32,17 @@ class AgentRuntime {
     this.connectionSettings = this.store.readConnectionSettings?.() || getConnectionSettings();
     this.ledger = dependencies.ledger || new Ledger();
     this.api = dependencies.api || new ApiClient(() => this.credential?.token, this.connectionSettings);
+    this.realtime = dependencies.realtime || new PrintRealtimeClient(this.store, {
+      onEvent: (message) => this.handleRealtimeMessage(message),
+      onStatus: (status) => this.handleRealtimeStatus(status),
+    });
     this.printerService = dependencies.printerService
       || new PrinterService(mainWindowProvider, () => this.store.readPrintLayout());
     this.running = false;
     this.credential = null;
     this.session = null;
-    this.socket = null;
-    this.socketConnected = false;
+    this.realtimeConnected = false;
+    this.realtimeConnectPromise = null;
     this.reconnectAttempt = 0;
     this.reconnectTimer = null;
     this.timers = new Set();
@@ -39,6 +53,8 @@ class AgentRuntime {
     this.lastPrinterFingerprint = null;
     this.lastPrinterSyncAt = 0;
     this.printerCount = 0;
+    this.reconciliationIntervalMs = dependencies.reconciliationIntervalMs
+      || RECONCILIATION_INTERVAL_MS;
     this.configuredTransport = getPrintTransport(this.connectionSettings);
     this.transport = this.configuredTransport;
   }
@@ -50,7 +66,7 @@ class AgentRuntime {
       deviceId: this.store.getDeviceId(),
       deviceName: this.store.getDeviceName(),
       running: this.running,
-      connected: this.socketConnected,
+      connected: this.realtimeConnected,
       transport: this.transport,
       connectionSettings: this.connectionSettings,
       printers: this.printerCount,
@@ -143,12 +159,9 @@ class AgentRuntime {
     this.reconnectTimer = null;
     for (const timer of this.timers) clearInterval(timer);
     this.timers.clear();
-    if (this.socket) {
-      this.socket.removeAllListeners();
-      this.socket.close();
-      this.socket = null;
-    }
-    this.socketConnected = false;
+    void this.realtime.disconnect();
+    this.realtimeConnected = false;
+    this.realtimeConnectPromise = null;
   }
 
   async initialize() {
@@ -159,24 +172,24 @@ class AgentRuntime {
       if (!this.running) return;
       this.startTimers();
 
-      if (this.shouldUseWebSocket()) this.connectWebSocket();
-      else this.requestReconciliation();
+      this.requestReconciliation();
+      if (this.shouldUseRealtime()) void this.connectRealtime();
     } catch (error) {
       this.handleRuntimeError(error);
       if (this.running) this.scheduleReconnect();
     }
   }
 
-  shouldUseWebSocket() {
+  shouldUseRealtime() {
     if (this.transport === 'polling') return false;
-    return this.session?.transport === 'websocket';
+    return this.session?.transport === 'supabase_realtime';
   }
 
   startTimers() {
     if (this.timers.size) return;
     this.addInterval(() => this.heartbeat(), HEARTBEAT_INTERVAL_MS);
     this.addInterval(() => this.syncPrintersIfNeeded(false), PRINTER_SCAN_INTERVAL_MS);
-    this.addInterval(() => this.requestReconciliation(), RECONCILIATION_INTERVAL_MS);
+    this.addInterval(() => this.requestReconciliation(), this.reconciliationIntervalMs);
     this.addInterval(() => this.renewSession(), SESSION_RENEWAL_MS);
   }
 
@@ -211,12 +224,14 @@ class AgentRuntime {
   }
 
   async renewSession() {
-    const previousTransport = this.session?.transport;
+    const previouslyRealtime = this.shouldUseRealtime();
     await this.refreshSession();
-    if (this.socketConnected && this.socket?.readyState === WebSocket.OPEN && this.session?.access_token) {
-      this.socket.send(JSON.stringify({ type: 'AUTH_REFRESH', access_token: this.session.access_token }));
-    } else if (this.shouldUseWebSocket() && previousTransport !== 'websocket') {
-      this.connectWebSocket();
+    if (!this.shouldUseRealtime() && previouslyRealtime) {
+      await this.realtime.disconnect();
+      this.realtimeConnected = false;
+      this.requestReconciliation();
+    } else if (this.shouldUseRealtime() && !this.realtimeConnected) {
+      void this.connectRealtime();
     }
   }
 
@@ -244,56 +259,67 @@ class AgentRuntime {
     return true;
   }
 
-  connectWebSocket() {
-    if (!this.running || !this.shouldUseWebSocket() || !this.session?.access_token) return;
-    if (this.socket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(this.socket.readyState)) return;
+  async connectRealtime() {
+    if (!this.running || !this.shouldUseRealtime() || this.realtimeConnectPromise) {
+      return this.realtimeConnectPromise;
+    }
 
-    const socket = new WebSocket(this.api.getWebSocketUrl(), {
-      headers: { Authorization: `Bearer ${this.session.access_token}` },
-      handshakeTimeout: 15000,
-      maxPayload: 4096,
-    });
-    this.socket = socket;
-
-    socket.on('open', () => {
-      this.socketConnected = true;
-      this.reconnectAttempt = 0;
-      event('WEBSOCKET_CONNECTED', { agentId: this.credential.agent?.id });
-      this.notifyStatus(this.status({ lastError: null }));
-    });
-    socket.on('message', (raw) => this.handleSocketMessage(raw));
-    socket.on('close', (code) => {
-      if (this.socket !== socket) return;
-      this.socket = null;
-      this.socketConnected = false;
-      event('WEBSOCKET_DISCONNECTED', { code });
-      this.notifyStatus(this.status({ lastError: 'Canal de impressão desconectado; tentando reconectar.' }));
+    this.realtimeConnectPromise = (async () => {
+      const publicConfig = this.session?.realtime || {};
+      let connected = await this.realtime.connect(publicConfig);
+      if (!connected) {
+        const credentials = await this.api.createRealtimeSession();
+        connected = await this.realtime.connect({ ...publicConfig, ...credentials });
+      }
+      if (connected) {
+        this.reconnectAttempt = 0;
+        event('SUPABASE_REALTIME_CONNECTED', { agentId: this.credential.agent?.id });
+        this.requestReconciliation();
+      }
+      return connected;
+    })().catch((error) => {
+      event('SUPABASE_REALTIME_ERROR', { message: error.message });
+      this.realtimeConnected = false;
+      this.requestReconciliation();
+      this.notifyStatus(this.status({
+        lastError: 'Tempo real indisponível; usando polling de contingência.',
+      }));
       if (this.running) this.scheduleReconnect();
+      return false;
+    }).finally(() => {
+      this.realtimeConnectPromise = null;
     });
-    socket.on('error', (error) => {
-      event('WEBSOCKET_ERROR', { message: error.message });
-    });
+
+    return this.realtimeConnectPromise;
   }
 
-  handleSocketMessage(raw) {
-    let message;
-    try {
-      message = JSON.parse(raw.toString());
-    } catch {
-      event('WEBSOCKET_INVALID_MESSAGE');
+  handleRealtimeStatus(status = {}) {
+    this.realtimeConnected = Boolean(status.connected);
+    if (this.realtimeConnected) {
+      this.notifyStatus(this.status({ lastError: null }));
       return;
     }
-    if (message.type === 'READY') {
-      this.requestReconciliation();
-      return;
+    if (this.running && this.shouldUseRealtime() && status.status !== 'CLOSED') {
+      this.notifyStatus(this.status({
+        lastError: 'Tempo real indisponível; usando polling de contingência.',
+      }));
+      this.scheduleReconnect();
     }
+  }
+
+  handleRealtimeMessage(message = {}) {
     if (message.type === 'PRINT_JOB_AVAILABLE' && message.print_job_id) {
       this.requestJob(message.print_job_id);
+      return;
+    }
+    if (message.type === 'PRINT_AGENT_REVOKED') {
+      event('AGENT_REVOKED_BY_REALTIME');
+      this.clearCredential();
     }
   }
 
   scheduleReconnect() {
-    if (!this.running || this.reconnectTimer || !this.shouldUseWebSocket()) return;
+    if (!this.running || this.reconnectTimer) return;
     const baseDelay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
     this.reconnectAttempt += 1;
     if (this.reconnectAttempt >= 3) this.requestReconciliation();
@@ -302,12 +328,14 @@ class AgentRuntime {
       this.reconnectTimer = null;
       try {
         await this.refreshSession();
-        this.connectWebSocket();
+        this.requestReconciliation();
+        if (this.shouldUseRealtime()) await this.connectRealtime();
       } catch (error) {
         this.handleRuntimeError(error);
         this.scheduleReconnect();
       }
     }, Math.round(baseDelay * jitter));
+    this.reconnectTimer.unref?.();
   }
 
   requestJob(jobId) {
@@ -411,6 +439,15 @@ class AgentRuntime {
     event('BACKEND_DISCONNECTED', { message: error.message });
     this.notifyStatus(this.status({ lastError: error.message }));
   }
+
+  isIdleForUpdate() {
+    return !this.processingPromise
+      && this.pendingJobIds.size === 0
+      && !this.reconciliationRequested
+      && this.retryNotBefore.size === 0;
+  }
 }
 
 module.exports = AgentRuntime;
+module.exports.RECONCILIATION_INTERVAL_MS = RECONCILIATION_INTERVAL_MS;
+module.exports.resolveReconciliationIntervalMs = resolveReconciliationIntervalMs;

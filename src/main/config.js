@@ -8,7 +8,8 @@ function normalizeEnvironment(value) {
 
 function normalizeTransport(value) {
   const normalized = String(value || '').trim().toLowerCase();
-  if (normalized === 'websocket' || normalized === 'polling') return normalized;
+  if (normalized === 'polling') return normalized;
+  if (normalized === 'websocket' || normalized === 'supabase_realtime') return 'auto';
   return 'auto';
 }
 
@@ -55,13 +56,14 @@ function getConnectionSettings(stored = null) {
 }
 
 function validateConnectionSettings(settings = {}) {
+  const requestedTransport = String(settings.transport || '').trim().toLowerCase();
   if (!String(settings.apiBaseUrl || '').trim()) {
     throw new Error('Informe a URL do backend.');
   }
   if (!['development', 'staging', 'production'].includes(String(settings.environment || '').toLowerCase())) {
     throw new Error('Selecione um ambiente válido.');
   }
-  if (!['auto', 'websocket', 'polling'].includes(String(settings.transport || '').toLowerCase())) {
+  if (!['auto', 'polling', 'websocket', 'supabase_realtime'].includes(requestedTransport)) {
     throw new Error('Selecione um transporte válido.');
   }
   return getConnectionSettings(settings);

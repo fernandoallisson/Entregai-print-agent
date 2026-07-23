@@ -2,6 +2,21 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const AgentRuntime = require('../src/main/agentRuntime');
 
+test('configura o polling de contingência para três minutos', () => {
+  assert.equal(AgentRuntime.RECONCILIATION_INTERVAL_MS, 3 * 60 * 1000);
+});
+
+test('permite polling de três segundos somente na execução local', () => {
+  assert.equal(AgentRuntime.resolveReconciliationIntervalMs({
+    isPackaged: false,
+    value: '3000',
+  }), 3000);
+  assert.equal(AgentRuntime.resolveReconciliationIntervalMs({
+    isPackaged: true,
+    value: '3000',
+  }), 3 * 60 * 1000);
+});
+
 const makeRuntime = ({ jobs = [] } = {}) => {
   const printed = [];
   const succeeded = [];
@@ -15,6 +30,7 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     transport: 'auto',
   };
   const configuredConnections = [];
+  const realtimeConnections = [];
   const api = {
     pair: async () => ({
       token: 'epa_paired',
@@ -32,6 +48,14 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     syncPrinters: async (printers) => synced.push(printers),
     heartbeat: async () => undefined,
     createSession: async () => ({ access_token: 'session', transport: 'polling' }),
+    createRealtimeSession: async () => ({
+      transport: 'supabase_realtime',
+      url: 'https://project.supabase.co',
+      publishable_key: 'sb_publishable_test',
+      topic: 'printing:agent:agent-1',
+      access_token: 'realtime-access',
+      refresh_token: 'realtime-refresh',
+    }),
     setSessionToken: () => undefined,
     configure: (settings) => configuredConnections.push(settings),
   };
@@ -42,6 +66,13 @@ const makeRuntime = ({ jobs = [] } = {}) => {
   const ledger = {
     has: (id) => entries.has(id),
     add: (id) => entries.add(id),
+  };
+  const realtime = {
+    connect: async (config) => {
+      realtimeConnections.push(config);
+      return true;
+    },
+    disconnect: async () => undefined,
   };
   const store = {
     readCredential: () => credential,
@@ -56,11 +87,23 @@ const makeRuntime = ({ jobs = [] } = {}) => {
     getDeviceName: () => 'Caixa',
     readPrintLayout: () => ({}),
   };
-  const runtime = new AgentRuntime(store, () => null, () => undefined, { api, printerService, ledger });
+  const runtime = new AgentRuntime(store, () => null, () => undefined, {
+    api,
+    printerService,
+    ledger,
+    realtime,
+  });
   runtime.running = true;
   runtime.credential = store.readCredential();
   runtime.session = { access_token: 'session', transport: 'polling' };
-  return { runtime, printed, succeeded, synced, configuredConnections };
+  return {
+    runtime,
+    printed,
+    succeeded,
+    synced,
+    configuredConnections,
+    realtimeConnections,
+  };
 };
 
 test('eventos duplicados do mesmo job produzem uma única impressão', async () => {
@@ -80,16 +123,68 @@ test('lista idêntica não é reenviada antes da verificação de segurança', a
   assert.equal(synced.length, 1);
 });
 
-test('modo automático retorna do polling para WebSocket quando o backend habilita o transporte', async () => {
+test('modo automático adota Supabase Realtime quando o backend habilita o transporte', async () => {
   const { runtime } = makeRuntime();
   runtime.configuredTransport = 'auto';
   runtime.transport = 'polling';
-  runtime.api.createSession = async () => ({ access_token: 'new-session', transport: 'websocket' });
+  runtime.api.createSession = async () => ({
+    access_token: 'new-session',
+    transport: 'supabase_realtime',
+    realtime: {
+      url: 'https://project.supabase.co',
+      publishable_key: 'sb_publishable_test',
+      topic: 'printing:agent:agent-1',
+    },
+  });
 
   await runtime.refreshSession();
 
-  assert.equal(runtime.transport, 'websocket');
-  assert.equal(runtime.shouldUseWebSocket(), true);
+  assert.equal(runtime.transport, 'supabase_realtime');
+  assert.equal(runtime.shouldUseRealtime(), true);
+});
+
+test('evento Realtime solicita o job e mantém deduplicação pelo ledger', async () => {
+  const job = { id: 'job-realtime', printer_id: 'printer-1', payload: {} };
+  const { runtime, printed } = makeRuntime({ jobs: [job] });
+
+  runtime.handleRealtimeMessage({ type: 'PRINT_JOB_AVAILABLE', print_job_id: job.id });
+  runtime.handleRealtimeMessage({ type: 'PRINT_JOB_AVAILABLE', print_job_id: job.id });
+  await runtime.drainJobs();
+
+  assert.deepEqual(printed, [job.id]);
+});
+
+test('falha do tempo real mantém o runtime apto ao polling de contingência', async () => {
+  const { runtime } = makeRuntime();
+  runtime.session = {
+    access_token: 'session',
+    transport: 'supabase_realtime',
+    realtime: {
+      url: 'https://project.supabase.co',
+      publishable_key: 'sb_publishable_test',
+      topic: 'printing:agent:agent-1',
+    },
+  };
+  runtime.transport = 'supabase_realtime';
+  runtime.realtime.connect = async () => { throw new Error('canal indisponível'); };
+  runtime.drainJobs = async () => undefined;
+
+  const connected = await runtime.connectRealtime();
+
+  assert.equal(connected, false);
+  assert.equal(runtime.reconciliationRequested, true);
+  assert.ok(runtime.reconnectTimer);
+  runtime.stop();
+});
+
+test('só permite atualização quando não há trabalho de impressão ou retry', () => {
+  const { runtime } = makeRuntime();
+  assert.equal(runtime.isIdleForUpdate(), true);
+  runtime.pendingJobIds.add('job-1');
+  assert.equal(runtime.isIdleForUpdate(), false);
+  runtime.pendingJobIds.clear();
+  runtime.retryNotBefore.set('job-1', Date.now() + 1000);
+  assert.equal(runtime.isIdleForUpdate(), false);
 });
 
 test('mudança de ambiente salva a conexão e exige novo vínculo', () => {

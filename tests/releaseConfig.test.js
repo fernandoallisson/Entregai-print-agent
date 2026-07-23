@@ -38,8 +38,9 @@ test('workflow publica somente por tag validada e inclui os três artefatos', ()
   assert.match(workflow, /highestVersion/);
 });
 
-test('serviço não solicita reinício ou downgrade automático', () => {
-  assert.doesNotMatch(updateService, /\.quitAndInstall\s*\(/);
+test('serviço instala automaticamente somente após a verificação de ociosidade', () => {
+  assert.match(updateService, /idleProvider/);
+  assert.match(updateService, /\.quitAndInstall\s*\(false, true\)/);
   assert.match(updateService, /autoInstallOnAppQuit = true/);
   assert.match(updateService, /allowDowngrade = false/);
 });

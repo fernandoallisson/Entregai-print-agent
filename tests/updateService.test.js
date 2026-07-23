@@ -25,6 +25,8 @@ function createService({ packaged = true, environment = 'production' } = {}) {
   const updater = new FakeUpdater();
   const events = [];
   const states = [];
+  let idle = true;
+  let beforeInstallCalls = 0;
   const service = new UpdateService({
     app: { isPackaged: packaged, getVersion: () => '1.1.0' },
     environmentProvider: () => environment,
@@ -32,10 +34,21 @@ function createService({ packaged = true, environment = 'production' } = {}) {
     autoUpdater: updater,
     logger: {},
     logEvent: (name, details) => events.push({ name, details }),
+    idleProvider: () => idle,
+    beforeInstall: () => { beforeInstallCalls += 1; },
     initialCheckDelayMs: 60 * 60 * 1000,
     checkIntervalMs: 60 * 60 * 1000,
+    installIdleMs: 60 * 1000,
+    installCheckIntervalMs: 60 * 60 * 1000,
   });
-  return { events, service, states, updater };
+  return {
+    beforeInstallCalls: () => beforeInstallCalls,
+    events,
+    service,
+    setIdle: (value) => { idle = value; },
+    states,
+    updater,
+  };
 }
 
 test('não consulta atualizações fora do aplicativo empacotado em produção', async () => {
@@ -46,8 +59,9 @@ test('não consulta atualizações fora do aplicativo empacotado em produção',
   assert.equal(development.service.getStatus().status, 'disabled');
 });
 
-test('baixa em segundo plano e nunca reinicia automaticamente', async () => {
-  const { service, updater } = createService();
+test('baixa em segundo plano e reinicia somente após sessenta segundos ocioso', async () => {
+  const context = createService();
+  const { service, updater } = context;
   try {
     assert.equal(service.start(), true);
     assert.equal(updater.autoDownload, true);
@@ -62,6 +76,15 @@ test('baixa em segundo plano e nunca reinicia automaticamente', async () => {
     assert.equal(service.getStatus().ready, true);
     assert.equal(service.getStatus().availableVersion, '1.1.1');
     assert.equal(updater.quitAndInstallCalls, 0);
+
+    context.setIdle(false);
+    assert.equal(service.checkAutomaticInstall(1000), false);
+    context.setIdle(true);
+    assert.equal(service.checkAutomaticInstall(2000), false);
+    assert.equal(service.checkAutomaticInstall(61999), false);
+    assert.equal(service.checkAutomaticInstall(62000), true);
+    assert.equal(updater.quitAndInstallCalls, 1);
+    assert.equal(context.beforeInstallCalls(), 1);
   } finally {
     service.stop();
   }
@@ -82,4 +105,3 @@ test('falha do atualizador mantém o serviço isolado e informa o erro', async (
     service.stop();
   }
 });
-

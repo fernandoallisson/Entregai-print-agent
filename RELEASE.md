@@ -9,8 +9,8 @@ Quando o aplicativo está empacotado e configurado no ambiente de produção, el
 1. consulta uma nova versão após a inicialização e periodicamente;
 2. baixa a atualização em segundo plano;
 3. continua imprimindo normalmente durante a consulta e o download;
-4. mantém a atualização pronta sem reiniciar o computador ou o agente;
-5. instala a atualização quando o aplicativo for encerrado normalmente.
+4. aguarda 60 segundos contínuos sem impressão, confirmação ou retry pendente;
+5. reinicia o agente e instala a atualização automaticamente.
 
 Credenciais, vínculo, impressoras, layout e conexão são armazenados no diretório de dados do usuário do Electron. O instalador não remove esse diretório durante uma atualização.
 
@@ -18,27 +18,19 @@ Erros de rede ou de atualização são registrados e exibidos discretamente. Ele
 
 Não existe downgrade automático. Uma correção ou rollback deve sempre ser publicada como uma versão numericamente superior.
 
-## Primeira instalação manual
+## Primeiro reinício da versão 2.1.0
 
-A primeira versão que contém o atualizador precisa ser instalada manualmente uma última vez em cada computador.
+A versão 2.0.4 já baixa atualizações, mas só instala quando o agente é encerrado. Por isso, cada computador precisa de um único encerramento e abertura manual para instalar a versão 2.1.0.
 
-Para esta implementação, gere e instale manualmente o arquivo:
+Durante esse primeiro corte:
 
-```text
-Entregaí Print Agent Setup 1.1.0.exe
-```
+1. confirme no Superadmin que a atualização foi baixada;
+2. encerre e abra o aplicativo uma vez;
+3. confirme que aparece `Versão 2.1.0`;
+4. mantenha o transporte em **Automático**;
+5. faça uma impressão de teste.
 
-Depois da instalação:
-
-1. abra o aplicativo;
-2. acesse **Configurar conexão**;
-3. selecione o ambiente **Produção**;
-4. informe a URL HTTPS do backend;
-5. mantenha o transporte em **Automático**;
-6. vincule o computador à loja;
-7. confirme na interface que aparece `Versão 1.1.0` e que as atualizações automáticas estão ativadas.
-
-As versões posteriores poderão ser recebidas remotamente.
+As versões posteriores serão instaladas automaticamente quando o agente estiver ocioso.
 
 ## Publicar uma nova versão
 
@@ -104,10 +96,10 @@ Após publicar:
 3. acompanhe o percentual do download;
 4. aguarde a mensagem de atualização pronta;
 5. confirme que impressões continuam funcionando;
-6. encerre o aplicativo normalmente após o expediente;
-7. abra o aplicativo novamente e confirme a nova versão.
+6. aguarde o agente ficar 60 segundos sem trabalho pendente;
+7. confirme o reinício automático e a nova versão.
 
-O aplicativo nunca chama reinício automático durante a operação. A instalação fica pendente até um encerramento normal.
+O agente nunca reinicia enquanto houver impressão, confirmação, evento pendente ou retry. Jobs que chegarem durante o curto reinício permanecem na fila durável e são reconciliados na inicialização.
 
 ## Assinatura digital
 
@@ -142,6 +134,6 @@ Exemplo: se `1.2.0` apresentar problema, publique a correção como `1.2.1`; nã
 ## Configurações externas pendentes
 
 - Confirmar em **Settings > Actions > General** que workflows podem criar Releases com `GITHUB_TOKEN`.
-- Instalar manualmente a primeira versão com atualizador em cada computador.
+- Reiniciar manualmente uma vez as instalações 2.0.4 para concluir a atualização 2.1.0.
 - Adicionar futuramente os secrets de assinatura digital.
 - Manter o repositório público enquanto ele for usado diretamente como provedor de atualizações.
