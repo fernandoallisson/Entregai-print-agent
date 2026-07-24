@@ -50,6 +50,7 @@ const DEFAULT_PRINT_LAYOUT = {
       showPrices: true,
       showOptions: true,
       showNotes: true,
+      boxEachItem: false,
       showOptionGroups: true,
       showOptionQuantities: true,
       optionPrefix: '',
@@ -97,6 +98,7 @@ const DEFAULT_PRINT_LAYOUT = {
       showPrices: false,
       showOptions: true,
       showNotes: true,
+      boxEachItem: false,
       showOptionGroups: true,
       showOptionQuantities: true,
       optionPrefix: '',
@@ -233,6 +235,9 @@ function normalizeProfile(input = {}, fallback) {
       showNotes: typeof input.itemOptions?.showNotes === 'boolean'
         ? input.itemOptions.showNotes
         : fallback.itemOptions.showNotes,
+      boxEachItem: typeof input.itemOptions?.boxEachItem === 'boolean'
+        ? input.itemOptions.boxEachItem
+        : fallback.itemOptions.boxEachItem,
       showOptionGroups: typeof input.itemOptions?.showOptionGroups === 'boolean'
         ? input.itemOptions.showOptionGroups
         : fallback.itemOptions.showOptionGroups,

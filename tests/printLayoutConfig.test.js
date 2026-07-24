@@ -11,6 +11,8 @@ test('inclui o layout padrão de produtos configuráveis em configurações anti
   assert.equal(layout.customer.configurableItems.variation_label, 'TAMANHO');
   assert.equal(layout.customer.configurableItems.observation_title, 'OBSERVAÇÃO');
   assert.equal(layout.kitchen.configurableItems.font_scale, 'normal');
+  assert.equal(layout.customer.itemOptions.boxEachItem, false);
+  assert.equal(layout.kitchen.itemOptions.boxEachItem, false);
 });
 
 test('normaliza os campos de produtos configuráveis salvos pelo agente', () => {
@@ -31,4 +33,14 @@ test('normaliza os campos de produtos configuráveis salvos pelo agente', () => 
   assert.equal(layout.customer.configurableItems.observation_style, 'plain');
   assert.equal(layout.customer.configurableItems.font_scale, 'large');
   assert.equal(layout.customer.configurableItems.show_fractions, false);
+});
+
+test('normaliza a opção de colocar cada produto em uma caixa por tipo de comanda', () => {
+  const layout = normalizePrintLayoutConfig({
+    customer: { itemOptions: { boxEachItem: true } },
+    kitchen: { itemOptions: { boxEachItem: false } },
+  });
+
+  assert.equal(layout.customer.itemOptions.boxEachItem, true);
+  assert.equal(layout.kitchen.itemOptions.boxEachItem, false);
 });

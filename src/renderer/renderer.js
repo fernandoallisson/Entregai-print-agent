@@ -38,6 +38,7 @@ const paperWidth = document.getElementById('paperWidth');
 const showPrices = document.getElementById('showPrices');
 const showOptions = document.getElementById('showOptions');
 const showNotes = document.getElementById('showNotes');
+const boxEachItem = document.getElementById('boxEachItem');
 const variationLabel = document.getElementById('variationLabel');
 const configurableFontScale = document.getElementById('configurableFontScale');
 const observationTitle = document.getElementById('observationTitle');
@@ -134,6 +135,7 @@ const previewTargetByControl = {
   showPrices: 'items',
   showOptions: 'options',
   showNotes: 'notes',
+  boxEachItem: 'items',
   variationLabel: 'configurableItems',
   configurableFontScale: 'configurableItems',
   observationTitle: 'configurableItems',
@@ -381,6 +383,7 @@ function renderLayoutForm() {
   showPrices.checked = Boolean(profile.itemOptions?.showPrices);
   showOptions.checked = profile.itemOptions?.showOptions !== false;
   showNotes.checked = profile.itemOptions?.showNotes !== false;
+  boxEachItem.checked = Boolean(profile.itemOptions?.boxEachItem);
   variationLabel.value = configurableItems.variation_label || '';
   configurableFontScale.value = configurableItems.font_scale || 'normal';
   observationTitle.value = configurableItems.observation_title || '';
@@ -676,6 +679,10 @@ showOptions.addEventListener('change', () => {
 
 showNotes.addEventListener('change', () => {
   updateItemOptions({ showNotes: showNotes.checked });
+});
+
+boxEachItem.addEventListener('change', () => {
+  updateItemOptions({ boxEachItem: boxEachItem.checked });
 });
 
 variationLabel.addEventListener('input', () => {

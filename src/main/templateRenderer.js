@@ -140,12 +140,13 @@ function renderConfigurableItem(item, showPrices, layout, options = {}) {
         <div class="option-group">
           ${showGroupTitles ? `<p class="group-title${layout.uppercase_group_titles ? ' uppercase' : ''}">${escapeHtml(group.name)}</p>` : ''}
           ${group.selections.map((selection) => {
-            const fraction = layout.show_fractions ? fractionLabel(selection.fracao) : '';
+            const fractionSuffix = layout.show_fractions ? text(selection.fracaoLabel) : '';
+            const fraction = layout.show_fractions && !fractionSuffix ? fractionLabel(selection.fracao) : '';
             const quantity = showQuantities && Number(selection.quantidade) > 1
               ? `${escapeHtml(selection.quantidade)}x `
               : '';
             const observation = selectionObservation(selection);
-            return `<p class="config-option${optionClass}">${fraction ? `<span class="fraction">${fraction}</span>` : ''}<span>${prefix ? `${escapeHtml(prefix)} ` : ''}${quantity}${escapeHtml(selection.nomeOpcao)}${observation ? ` - ${escapeHtml(observation)}` : ''}</span></p>`;
+            return `<p class="config-option${optionClass}">${fraction ? `<span class="fraction">${fraction}</span>` : ''}<span>${prefix ? `${escapeHtml(prefix)} ` : ''}${quantity}${escapeHtml(selection.nomeOpcao)}${observation ? ` - ${escapeHtml(observation)}` : ''}${fractionSuffix ? ` (${escapeHtml(fractionSuffix)})` : ''}</span></p>`;
           }).join('')}
         </div>
       `).join('')}
@@ -301,8 +302,42 @@ function renderAddress(order = {}) {
   `;
 }
 
-function renderPayment(payment = null) {
-  if (!payment) {
+const INACTIVE_PAYMENT_STATUSES = new Set([
+  'cancelado',
+  'cancelada',
+  'cancelled',
+  'estornado',
+  'estornada',
+  'reembolsado',
+  'refunded',
+  'expirado',
+  'expired',
+  'falhou',
+  'failed',
+  'recusado',
+  'rejeitado',
+]);
+
+function isCurrentPayment(payment) {
+  const status = text(payment?.status).toLocaleLowerCase('pt-BR');
+  const superseded = payment?.metadata?.substituido_por_ajuste_admin;
+  return Boolean(payment) &&
+    !INACTIVE_PAYMENT_STATUSES.has(status) &&
+    superseded !== true &&
+    superseded !== 'true';
+}
+
+function currentPayments(payload = {}) {
+  const payments = Array.isArray(payload.payments)
+    ? payload.payments
+    : payload.payment
+      ? [payload.payment]
+      : [];
+  return payments.filter(isCurrentPayment);
+}
+
+function renderPayments(payments = []) {
+  if (payments.length === 0) {
     return `
       <div class="payment-box">
         <p class="box-title">PAGAMENTO</p>
@@ -312,14 +347,21 @@ function renderPayment(payment = null) {
     `;
   }
 
-  const changeLines = payment.troco?.linhas || [];
   return `
     <div class="payment-box">
-      <p class="box-title">PAGAMENTO</p>
-      <p><span class="bold">Forma:</span> ${escapeHtml(payment.formaPagamentoLabel || payment.formaPagamento || 'Não informado')}</p>
-      <p><span class="bold">Status:</span> ${escapeHtml(payment.statusLabel || payment.status || 'Não informado')}</p>
-      <p class="payment-status">${escapeHtml(payment.pagoLabel || (payment.pago ? 'PAGO' : 'PAGAMENTO PENDENTE'))}</p>
-      ${changeLines.map((line) => `<p class="cash-change">${escapeHtml(line)}</p>`).join('')}
+      <p class="box-title">${payments.length > 1 ? 'PAGAMENTOS' : 'PAGAMENTO'}</p>
+      ${payments.map((payment) => {
+        const changeLines = payment.troco?.linhas || [];
+        return `
+          <div class="payment-entry">
+            <p><span class="bold">Forma:</span> ${escapeHtml(payment.formaPagamentoLabel || payment.formaPagamento || 'Não informado')}</p>
+            <p><span class="bold">Valor:</span> R$ ${money(payment.valor)}</p>
+            <p><span class="bold">Status:</span> ${escapeHtml(payment.statusLabel || payment.status || 'Não informado')}</p>
+            <p class="payment-status">${escapeHtml(payment.pagoLabel || (payment.pago ? 'PAGO' : 'PAGAMENTO PENDENTE'))}</p>
+            ${changeLines.map((line) => `<p class="cash-change">${escapeHtml(line)}</p>`).join('')}
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -329,7 +371,7 @@ function renderTotals(totals = null, typeLabel = '') {
   const isPickup = text(typeLabel).toUpperCase().includes('RETIRADA');
   return `
     <div class="divider"></div>
-    <div class="row"><span>Subtotal</span><span>R$ ${money(totals.subtotal)}</span></div>
+    <div class="row"><span>${escapeHtml(totals.subtotalLabel || 'Subtotal')}</span><span>R$ ${money(totals.subtotal)}</span></div>
     <div class="row"><span>${isPickup ? 'Retirada na loja' : 'Entrega'}</span><span>R$ ${money(totals.taxaEntrega)}</span></div>
     <div class="row"><span>Desconto</span><span>R$ ${money(totals.desconto)}</span></div>
     <div class="solid"></div>
@@ -416,6 +458,7 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
   const metaFont = cssNumber(layout.metaFontPx, isKitchen ? 18 : 14);
   const totalFont = cssNumber(layout.totalFontPx, isKitchen ? 20 : 15);
   const showBorders = layout.showBorders !== false;
+  const boxEachItem = itemOptions.boxEachItem === true;
   const highlightOptions = itemOptions.highlightOptions === true;
   const boldOptions = itemOptions.boldOptions === true;
   const borderWidth = showBorders ? cssNumber(layout.borderWidthPx, isKitchen ? 2 : 1) : 0;
@@ -487,7 +530,16 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
     .ticket-value { display: block; font-size: calc(${ticketFont}px * var(--block-scale)); line-height: .95; font-weight: 900; margin-top: ${Math.max(2, lineGap - 1)}px; }
     .kitchen-meta { border: ${borderStyle(borderWidth)}; padding: ${boxPadding}px; margin: ${blockGap}px 0; text-align: left; }
     .kitchen-meta p { font-size: calc(${metaFont}px * var(--block-scale)); line-height: 1.16; margin-bottom: ${lineGap}px; }
-    .item { ${isKitchen ? `border-bottom: ${borderStyle(itemDividerWidth)}; padding-bottom: ${Math.max(0, itemGap - 1)}px;` : ''} margin-bottom: ${itemGap}px; }
+    .item {
+      ${boxEachItem
+        ? `border: ${borderStyle(borderWidth)}; padding: ${boxPadding}px;`
+        : isKitchen
+          ? `border-bottom: ${borderStyle(itemDividerWidth)}; padding-bottom: ${Math.max(0, itemGap - 1)}px;`
+          : ''}
+      margin-bottom: ${itemGap}px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
     .product { font-size: calc(${productFont}px * var(--block-scale)); line-height: ${isKitchen ? 1.08 : 1.2}; margin-bottom: ${lineGap}px; font-weight: ${isKitchen ? 900 : 700}; }
     .configurable-item .product { font-size: calc(${productFont * configurableFontScale}px * var(--block-scale)); }
     .product span, .option, .obs, .address-line, .cash-change, p {
@@ -518,6 +570,7 @@ function renderStyles(width, isKitchen, profile = {}, configurableLayout = DEFAU
     .address-box, .payment-box { border: ${borderStyle(borderWidth)}; padding: ${boxPadding}px; margin: ${blockGap}px 0; }
     .box-title { text-align: center; font-size: calc(${metaFont}px * var(--block-scale)); font-weight: 900; margin-bottom: ${lineGap}px; }
     .address-line { font-size: calc(${metaFont}px * var(--block-scale)); line-height: 1.2; margin-bottom: ${lineGap}px; }
+    .payment-entry + .payment-entry { border-top: ${borderStyle(Math.min(borderWidth, 1))}; margin-top: ${lineGap + 2}px; padding-top: ${lineGap + 2}px; }
     .payment-status { border: ${borderStyle(Math.min(borderWidth, 1))}; padding: ${Math.max(0, boxPadding - 2)}px; text-align: center; font-size: calc(${metaFont}px * var(--block-scale)); font-weight: 900; margin: ${lineGap}px 0; }
     .cash-change { font-size: calc(${baseFont}px * var(--block-scale)); line-height: 1.2; margin-bottom: ${lineGap}px; font-weight: 900; }
     .total { font-size: calc(${totalFont}px * var(--block-scale)); font-weight: 900; }
@@ -566,7 +619,7 @@ function renderBlockContent(blockId, context) {
     case 'totals':
       return isKitchen ? '' : renderTotals(payload.totals, typeLabel);
     case 'payment':
-      return isKitchen ? '' : renderPayment(payload.payment);
+      return isKitchen ? '' : renderPayments(currentPayments(payload));
     case 'footer':
       return renderFooter(profile);
     default:
